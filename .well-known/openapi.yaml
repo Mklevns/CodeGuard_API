@@ -1,0 +1,231 @@
+openapi: 3.1.0
+info:
+  title: CodeGuard API
+  version: 1.0.0
+  description: Audits ML and RL Python files for issues using static analysis tools.
+  contact:
+    name: CodeGuard API Support
+  license:
+    name: MIT
+servers:
+  - url: https://your-replit-app.replit.app
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+paths:
+  /audit:
+    post:
+      operationId: auditCode
+      summary: Audits Python code and returns structured issue reports.
+      description: |
+        Analyzes one or more Python files for syntax errors, style issues, 
+        and best practice violations using flake8 static analysis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditRequest"
+            examples:
+              simple_audit:
+                summary: Simple audit example
+                value:
+                  files:
+                    - filename: "example.py"
+                      content: "import torch\n\ndef train_model():\n    pass"
+              multi_file_audit:
+                summary: Multi-file audit example
+                value:
+                  files:
+                    - filename: "train.py"
+                      content: "import torch\n\n# TODO: training code"
+                    - filename: "utils.py"
+                      content: "def seed_everything(seed): pass"
+                  options:
+                    level: "strict"
+                    framework: "pytorch"
+                    target: "gpu"
+      responses:
+        '200':
+          description: Audit results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditResponse"
+              examples:
+                audit_results:
+                  summary: Example audit results
+                  value:
+                    summary: "2 issues found across 2 files"
+                    issues:
+                      - filename: "train.py"
+                        line: 1
+                        type: "error"
+                        description: "F401: 'torch' imported but unused"
+                      - filename: "utils.py"
+                        line: 1
+                        type: "best_practice"
+                        description: "Missing function docstring"
+                    fixes:
+                      - filename: "train.py"
+                        line: 1
+                        suggestion: "Remove unused import"
+        '400':
+          description: Bad request - invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Invalid file format"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Analysis failed: flake8 not available"
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check endpoint
+      description: Returns the health status of the service.
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  service:
+                    type: string
+                    example: "CodeGuard API"
+components:
+  schemas:
+    CodeFile:
+      type: object
+      required:
+        - filename
+        - content
+      properties:
+        filename:
+          type: string
+          description: Name of the file
+          example: "train.py"
+        content:
+          type: string
+          description: Content of the file
+          example: "import torch\n\n# TODO: training code"
+    
+    AuditOptions:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [basic, strict, production]
+          default: "strict"
+          description: Analysis level
+        framework:
+          type: string
+          enum: [pytorch, tensorflow, jax, scikit-learn, other]
+          default: "pytorch"
+          description: ML framework being used
+        target:
+          type: string
+          enum: [cpu, gpu, tpu]
+          default: "gpu"
+          description: Target platform
+    
+    AuditRequest:
+      type: object
+      required:
+        - files
+      properties:
+        files:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CodeFile"
+          description: List of files to analyze
+        options:
+          $ref: "#/components/schemas/AuditOptions"
+          description: Optional audit configuration
+    
+    Issue:
+      type: object
+      required:
+        - filename
+        - line
+        - type
+        - description
+      properties:
+        filename:
+          type: string
+          description: File where the issue was found
+          example: "train.py"
+        line:
+          type: integer
+          minimum: 1
+          description: Line number of the issue
+          example: 1
+        type:
+          type: string
+          enum: [error, style, best_practice, complexity, naming]
+          description: Type of issue
+          example: "style"
+        description:
+          type: string
+          description: Description of the issue
+          example: "F401: 'torch' imported but unused"
+    
+    Fix:
+      type: object
+      required:
+        - filename
+        - line
+        - suggestion
+      properties:
+        filename:
+          type: string
+          description: File where the fix should be applied
+          example: "train.py"
+        line:
+          type: integer
+          minimum: 1
+          description: Line number for the fix
+          example: 1
+        suggestion:
+          type: string
+          description: Suggested fix
+          example: "Remove unused import"
+    
+    AuditResponse:
+      type: object
+      required:
+        - summary
+        - issues
+        - fixes
+      properties:
+        summary:
+          type: string
+          description: Summary of the audit results
+          example: "2 issues found across 2 files"
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/Issue"
+          description: List of issues found
+        fixes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fix"
+          description: List of suggested fixes
