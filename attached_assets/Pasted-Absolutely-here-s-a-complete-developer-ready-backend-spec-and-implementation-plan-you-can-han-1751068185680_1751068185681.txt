@@ -1,0 +1,339 @@
+Absolutely — here's a **complete, developer-ready backend spec and implementation plan** you can hand off to a Replit engineer or freelance dev to build your `CodeGuard` backend API.
+
+---
+
+# 🛠️ CodeGuard Backend — Technical Specification for Replit Engineer
+
+---
+
+## 🔷 Overview
+
+**Goal**: Build a FastAPI-based backend service that powers `codeguard_GPT`, an AI agent for auditing machine learning (ML) and reinforcement learning (RL) code. This backend will expose a single `/audit` API endpoint, which takes raw code (or multiple files), analyzes it, and returns structured issue reports and fix suggestions.
+
+This service will later be consumed by OpenAI Actions via an OpenAPI spec.
+
+---
+
+## 📦 Tech Stack
+
+| Component        | Choice                            | Notes                                         |
+| ---------------- | --------------------------------- | --------------------------------------------- |
+| Framework        | FastAPI                           | Modern, async, built-in OpenAPI support       |
+| Runtime Server   | Uvicorn                           | ASGI server                                   |
+| Linter/Analyzers | ast, flake8, mypy, pylint, libcst | Used to analyze code                          |
+| Python Version   | 3.10+                             | Required by some modern static analysis tools |
+| Deployment       | Replit-hosted server              | Exposes public HTTPS endpoint                 |
+| Logging          | `loguru` or basic logging         | Optional but helpful                          |
+
+---
+
+## 🔌 API Specification
+
+### **Endpoint**: `POST /audit`
+
+**Description**: Accepts one or more code files, analyzes them for syntax errors, bad practices, production issues, and returns a JSON audit report with suggested fixes.
+
+---
+
+### ✅ Request
+
+```json
+{
+  "files": [
+    {
+      "filename": "train.py",
+      "content": "import torch\n# TODO: training loop"
+    },
+    {
+      "filename": "utils.py",
+      "content": "def seed_everything(seed): pass"
+    }
+  ],
+  "options": {
+    "level": "production",
+    "framework": "pytorch",
+    "target": "gpu"
+  }
+}
+```
+
+---
+
+### ✅ Response
+
+```json
+{
+  "summary": "3 issues found across 2 files",
+  "issues": [
+    {
+      "filename": "train.py",
+      "line": 1,
+      "type": "style",
+      "description": "Unused import 'torch'"
+    },
+    {
+      "filename": "utils.py",
+      "line": 1,
+      "type": "best_practice",
+      "description": "Function 'seed_everything' is missing a docstring"
+    }
+  ],
+  "fixes": [
+    {
+      "filename": "train.py",
+      "line": 1,
+      "suggestion": "Remove unused import 'torch'"
+    }
+  ]
+}
+```
+
+---
+
+## 📁 Directory Structure
+
+```
+codeguard_backend/
+│
+├── main.py                # FastAPI app
+├── audit.py               # Core audit logic
+├── models.py              # Request/response data models (Pydantic)
+├── utils.py               # Helper functions
+├── requirements.txt       # Dependencies
+└── .well-known/
+    └── openapi.yaml       # OpenAPI 3.1 spec for GPT Action
+```
+
+---
+
+## 🧠 Component Breakdown
+
+### 1. `main.py`
+
+```python
+from fastapi import FastAPI, HTTPException
+from models import AuditRequest, AuditResponse
+from audit import analyze_code
+
+app = FastAPI(title="CodeGuard API")
+
+@app.post("/audit", response_model=AuditResponse)
+async def audit_code(request: AuditRequest):
+    try:
+        return analyze_code(request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+```
+
+---
+
+### 2. `models.py`
+
+```python
+from pydantic import BaseModel
+from typing import List, Optional
+
+class CodeFile(BaseModel):
+    filename: str
+    content: str
+
+class AuditOptions(BaseModel):
+    level: Optional[str] = "strict"
+    framework: Optional[str] = "pytorch"
+    target: Optional[str] = "gpu"
+
+class AuditRequest(BaseModel):
+    files: List[CodeFile]
+    options: Optional[AuditOptions]
+
+class Issue(BaseModel):
+    filename: str
+    line: int
+    type: str
+    description: str
+
+class Fix(BaseModel):
+    filename: str
+    line: int
+    suggestion: str
+
+class AuditResponse(BaseModel):
+    summary: str
+    issues: List[Issue]
+    fixes: List[Fix]
+```
+
+---
+
+### 3. `audit.py`
+
+```python
+import ast
+import subprocess
+from models import AuditRequest, AuditResponse, Issue, Fix
+
+def analyze_code(request: AuditRequest) -> AuditResponse:
+    issues = []
+    fixes = []
+
+    for file in request.files:
+        # Example: use flake8 to check for issues
+        with open(file.filename, "w", encoding="utf-8") as f:
+            f.write(file.content)
+
+        result = subprocess.run(
+            ["flake8", file.filename, "--format=%(row)d::%(code)s::%(text)s"],
+            capture_output=True,
+            text=True
+        )
+
+        for line in result.stdout.strip().split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("::")
+            if len(parts) == 3:
+                lineno, code, desc = parts
+                issues.append(Issue(
+                    filename=file.filename,
+                    line=int(lineno),
+                    type="style" if code.startswith("F") else "best_practice",
+                    description=desc
+                ))
+
+        # Example: fake suggestion
+        if "import" in file.content:
+            fixes.append(Fix(
+                filename=file.filename,
+                line=1,
+                suggestion="Remove unused import if unnecessary"
+            ))
+
+    summary = f"{len(issues)} issues found across {len(request.files)} files"
+    return AuditResponse(summary=summary, issues=issues, fixes=fixes)
+```
+
+---
+
+### 4. `requirements.txt`
+
+```
+fastapi
+uvicorn
+pydantic
+flake8
+```
+
+You can extend this later with:
+
+```
+pylint
+black
+mypy
+tree-sitter
+libcst
+```
+
+---
+
+## 🌐 `.well-known/openapi.yaml`
+
+Save this OpenAPI spec to `.well-known/openapi.yaml` so OpenAI can auto-discover your Action:
+
+```yaml
+openapi: 3.1.0
+info:
+  title: CodeGuard API
+  version: 1.0.0
+  description: Audits ML and RL code for bugs, best practices, and production-readiness.
+servers:
+  - url: https://your-replit-project.repl.co
+paths:
+  /audit:
+    post:
+      operationId: auditCode
+      summary: Audits code for bugs, issues, and production concerns.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditRequest"
+      responses:
+        '200':
+          description: Audit results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditResponse"
+components:
+  schemas:
+    AuditRequest:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              content:
+                type: string
+        options:
+          type: object
+          properties:
+            level:
+              type: string
+              enum: [basic, strict, production]
+            framework:
+              type: string
+              enum: [pytorch, tensorflow, jax]
+            target:
+              type: string
+              enum: [cpu, gpu, tpu]
+    AuditResponse:
+      type: object
+      properties:
+        summary:
+          type: string
+        issues:
+          type: array
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              line:
+                type: integer
+              type:
+                type: string
+              description:
+                type: string
+        fixes:
+          type: array
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              line:
+                type: integer
+              suggestion:
+                type: string
+```
+
+---
+
+## ✅ Deliverables Summary
+
+The developer on Replit should deliver:
+
+1. 🖥 **FastAPI app** with `/audit` route
+2. ⚙️ **Analysis engine** using at least `flake8`, with pluggable support for more tools
+3. 🌍 **Hosted endpoint** (e.g. `https://codeguard.replit.app`)
+4. 📝 `.well-known/openapi.yaml` with accurate schema
+5. 🚀 Instructions to deploy, update, and extend the service
+
+---
+
+Would you like me to export this as a `.pdf` or a `.docx` brief as well, for sharing with a contractor or dev team?
