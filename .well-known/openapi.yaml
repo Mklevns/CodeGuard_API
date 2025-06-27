@@ -8,10 +8,8 @@ info:
   license:
     name: MIT
 servers:
-  - url: https://your-replit-app.replit.app
-    description: Production server
-  - url: http://localhost:8000
-    description: Development server
+  - url: http://34.55.167.13:5000
+    description: Public API instance running on port 5000
 paths:
   /audit:
     post:

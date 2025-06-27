@@ -1,0 +1,114 @@
+Save this as /.well-known/openapi.yaml (already accessible at http://34.55.167.13:5000/.well-known/openapi.yaml if deployed correctly):
+
+yaml
+Copy
+Edit
+openapi: 3.1.0
+info:
+  title: CodeGuard API
+  version: 1.0.0
+  description: >
+    A FastAPI backend service that audits ML/RL Python code and provides structured issue reports and fix suggestions.
+    It uses static analysis tools like flake8 to identify syntax errors, style violations, and best practice issues.
+servers:
+  - url: http://34.55.167.13:5000
+    description: Public API instance running on port 5000
+paths:
+  /audit:
+    post:
+      operationId: auditCode
+      summary: Analyze Python code files for syntax and style issues.
+      description: >
+        Accepts one or more Python code files and returns a structured list of detected issues and fix suggestions.
+        Uses static analysis tools like flake8 under the hood.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditRequest'
+      responses:
+        '200':
+          description: Audit result with issues and possible fixes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditResponse'
+        '400':
+          description: Invalid input
+        '500':
+          description: Internal server error during analysis
+components:
+  schemas:
+    CodeFile:
+      type: object
+      properties:
+        filename:
+          type: string
+          description: Name of the file being analyzed
+        content:
+          type: string
+          description: Python source code content of the file
+      required: [filename, content]
+
+    AuditOptions:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [basic, strict, production]
+          default: strict
+        framework:
+          type: string
+          enum: [pytorch, tensorflow, jax]
+        target:
+          type: string
+          enum: [cpu, gpu, tpu]
+
+    AuditRequest:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeFile'
+        options:
+          $ref: '#/components/schemas/AuditOptions'
+      required: [files]
+
+    Issue:
+      type: object
+      properties:
+        filename:
+          type: string
+        line:
+          type: integer
+        type:
+          type: string
+          description: Type of issue (e.g., error, style, best_practice)
+        description:
+          type: string
+
+    Fix:
+      type: object
+      properties:
+        filename:
+          type: string
+        line:
+          type: integer
+        suggestion:
+          type: string
+
+    AuditResponse:
+      type: object
+      properties:
+        summary:
+          type: string
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+        fixes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Fix'

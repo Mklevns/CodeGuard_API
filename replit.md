@@ -79,7 +79,24 @@ CodeGuard is a FastAPI-based backend service that provides static code analysis 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+- June 27, 2025: Initial CodeGuard API implementation completed and deployed
+- API server running on port 5000 with public access at http://34.55.167.13:5000
+- All core endpoints functional: /audit, /health, /.well-known/openapi.yaml, /docs
+- Flake8 integration working correctly with comprehensive error detection
+- OpenAPI specification updated with correct server URL for GPT Action integration
+
+## Deployment Status
+
+**Current Status**: ✓ Live and operational
+**Public URL**: http://34.55.167.13:5000
+**Key Endpoints**:
+- `/audit` - Main code analysis endpoint (POST)
+- `/docs` - Interactive API documentation 
+- `/health` - Service health check
+- `/.well-known/openapi.yaml` - OpenAPI spec for GPT Actions
+
 ## Changelog
 
-Changelog:
-- June 27, 2025. Initial setup
+- June 27, 2025: Initial setup and full implementation completed
