@@ -8,7 +8,7 @@ info:
   license:
     name: MIT
 servers:
-  - url: https://codeguard-api.replit.app
+  - url: https://codeguard-api.run.app
     description: Production deployment
 paths:
   /audit:
@@ -19,7 +19,7 @@ paths:
         Analyzes one or more Python files for syntax errors, style issues, 
         and best practice violations using flake8 static analysis.
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -106,7 +106,7 @@ paths:
       summary: Check authentication status
       description: Verify if the provided API key is valid and return user information.
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       responses:
         '200':
           description: Authentication successful
@@ -293,8 +293,8 @@ components:
             $ref: "#/components/schemas/Fix"
           description: List of suggested fixes
   securitySchemes:
-    bearerAuth:
+    BearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: API Key
+      bearerFormat: JWT
       description: "Provide your API key as a Bearer token in the Authorization header"

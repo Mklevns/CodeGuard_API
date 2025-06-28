@@ -1,0 +1,141 @@
+Your OpenAPI 3.1.0 spec (e.g. openapi-deployment.yaml) must be publicly accessible at:
+
+arduino
+Copy
+Edit
+https://codeguard-api.run.app/openapi-deployment.yaml
+Make sure the servers: field in that YAML file matches the deployed domain and protocol:
+
+yaml
+Copy
+Edit
+servers:
+  - url: https://codeguard-api.run.app
+🔐 3. ✅ Authentication
+In your OpenAPI spec, define Bearer token API Key authentication like this:
+
+yaml
+Copy
+Edit
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT  # optional
+security:
+  - BearerAuth: []
+You'll set this token in ChatGPT later:
+
+vbnet
+Copy
+Edit
+Authorization: Bearer PYFIldP3... (your actual key)
+📄 4. ✅ Terms & Privacy URLs
+Make sure these pages are live and reachable:
+
+Privacy Policy
+https://codeguard-api.run.app/privacy-policy
+
+Terms of Service
+https://codeguard-api.run.app/terms-of-service
+
+Even simple HTML placeholders are fine initially.
+
+🧪 5. ✅ Confirm Testable Endpoints
+Endpoint	Method	Example URL
+Health check	GET	https://codeguard-api.run.app/health
+Audit API	POST	https://codeguard-api.run.app/audit
+OpenAPI spec	GET	https://codeguard-api.run.app/openapi-deployment.yaml
+
+📥 6. ✅ Sample Audit Request for Testing
+json
+Copy
+Edit
+{
+  "files": [
+    {
+      "filename": "example.py",
+      "content": "import torch\n\ndef train_model():\n    # TODO: implement training\n    pass"
+    }
+  ],
+  "options": {
+    "level": "strict",
+    "framework": "pytorch",
+    "target": "gpu"
+  }
+}
+Expected response:
+
+json
+Copy
+Edit
+{
+  "summary": "1 issue found across 1 file",
+  "issues": [
+    {
+      "filename": "example.py",
+      "line": 1,
+      "type": "error",
+      "description": "F401: 'torch' imported but unused"
+    }
+  ],
+  "fixes": [
+    {
+      "filename": "example.py",
+      "line": 1,
+      "suggestion": "Remove unused import"
+    }
+  ]
+}
+🤖 7. ✅ ChatGPT Action Setup Steps
+Go to https://platform.openai.com/gpts
+
+Click "Create" or select your GPT (e.g. CodeGuard_GPT)
+
+Go to “Actions”
+
+Import API schema via:
+
+arduino
+Copy
+Edit
+https://codeguard-api.run.app/openapi-deployment.yaml
+Set Authentication Type to:
+
+API Key
+
+Bearer
+
+Header: Authorization
+
+Token: PYFIldP3...
+
+Add:
+
+Privacy URL: https://codeguard-api.run.app/privacy-policy
+
+Terms URL: https://codeguard-api.run.app/terms-of-service
+
+Click "Save & Test"
+
+Once it works, Publish the Action ✅
+
+💬 8. ✅ Suggested Prompts for Users
+Here are example prompts that users can try in ChatGPT once your Action is live:
+
+“Audit this Python training loop”
+
+“Analyze my PyTorch code for bugs and optimizations”
+
+“Check this RL environment setup for issues”
+
+“Review this script for production readiness”
+
+📌 Summary
+Task	Status
+API deployed with HTTPS	✅ Required
+OpenAPI spec hosted	✅ Required
+Bearer token auth configured	✅ Required
+Terms & Privacy URLs available	✅ Required
+Action tested via ChatGPT	🚀 You're ready now
