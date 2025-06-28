@@ -34,7 +34,9 @@ async def root():
         "endpoints": {
             "audit": "/audit",
             "openapi": "/.well-known/openapi.yaml",
-            "docs": "/docs"
+            "docs": "/docs",
+            "privacy": "/privacy-policy",
+            "terms": "/terms-of-service"
         }
     }
 
@@ -80,6 +82,24 @@ async def auth_status(current_user: dict = Depends(get_current_user)):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "CodeGuard API"}
+
+@app.get("/privacy-policy")
+async def privacy_policy():
+    """Serve the privacy policy for the CodeGuard API service."""
+    privacy_path = "privacy-policy.md"
+    if os.path.exists(privacy_path):
+        return FileResponse(privacy_path, media_type="text/markdown")
+    else:
+        raise HTTPException(status_code=404, detail="Privacy policy not found")
+
+@app.get("/terms-of-service")
+async def terms_of_service():
+    """Serve the terms of service for the CodeGuard API service."""
+    terms_path = "terms-of-service.md"
+    if os.path.exists(terms_path):
+        return FileResponse(terms_path, media_type="text/markdown")
+    else:
+        raise HTTPException(status_code=404, detail="Terms of service not found")
 
 if __name__ == "__main__":
     # Run the application

@@ -127,6 +127,34 @@ paths:
                     type: object
         '401':
           description: Unauthorized - invalid or missing API key
+  /privacy-policy:
+    get:
+      operationId: getPrivacyPolicy
+      summary: Get privacy policy
+      description: Returns the privacy policy document for the CodeGuard API service.
+      responses:
+        '200':
+          description: Privacy policy document
+          content:
+            text/markdown:
+              schema:
+                type: string
+        '404':
+          description: Privacy policy not found
+  /terms-of-service:
+    get:
+      operationId: getTermsOfService
+      summary: Get terms of service
+      description: Returns the terms of service document for the CodeGuard API service.
+      responses:
+        '200':
+          description: Terms of service document
+          content:
+            text/markdown:
+              schema:
+                type: string
+        '404':
+          description: Terms of service not found
   /health:
     get:
       operationId: healthCheck
