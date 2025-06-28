@@ -150,6 +150,15 @@ Preferred communication style: Simple, everyday language.
 - Analyzes YAML configuration files for hyperparameter validation
 - **Analytics Dashboard**: Comprehensive usage analytics with insights and alerts
 - Export capabilities for Markdown and JSON reports
+- **Historical Audit Timeline**: 30-day trend analysis showing code quality improvement over time
+- Timeline tracks daily/weekly trends with improvement/worsening/stable categorization
+- **OpenAI GPT Connector**: Natural language queries for past audits ("Show me gym issues")
+- Intelligent query parsing supporting framework-specific, error pattern, and performance queries
+- **Prompt-based Issue Explainers**: Context-aware explanations for code issues
+- Static explanations for common security issues (pickle, eval) with alternatives and examples
+- GPT-powered dynamic explanations for complex issues when API key available
+- **Enhanced API Usage Dashboard**: Real-time tracking of user traffic and tool usage patterns
+- Framework trend analysis showing PyTorch/TensorFlow/Gym usage over time
 - System now processes 8 analysis tools: flake8, pylint, mypy, black, isort, ml_rules, custom_rules, rl_plugin
 - Successfully tested with 51 total issues detected across 8 tools and 10 auto-fixable suggestions
 
@@ -164,6 +173,10 @@ Preferred communication style: Simple, everyday language.
 - `/metrics/usage` - Usage analytics and performance metrics
 - `/dashboard` - Comprehensive analytics dashboard with insights
 - `/dashboard/export` - Export reports in Markdown/JSON formats
+- `/timeline` - Historical audit timeline with trend analysis
+- `/timeline/frameworks` - Framework usage trends over time
+- `/query/audits` - Natural language queries for past audit data
+- `/explain/issue` - Context-aware explanations for code issues
 - `/docs` - Interactive API documentation 
 - `/health` - Service health check
 - `/.well-known/openapi.yaml` - OpenAPI spec for GPT Actions

@@ -9,6 +9,8 @@ from auth import verify_api_key, get_current_user
 from rule_loader import CustomRuleEngine
 from telemetry import telemetry_collector, metrics_analyzer
 from dashboard import get_dashboard
+from historical_timeline import get_timeline_generator
+from gpt_connector import get_gpt_connector, get_issue_explainer
 import uuid
 import time
 
@@ -227,6 +229,75 @@ async def export_analytics_report(days: int = 7, format: str = "markdown"):
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to export report: {str(e)}")
+
+@app.get("/timeline")
+async def get_historical_timeline(days: int = 30, granularity: str = "daily"):
+    """Get historical audit timeline showing trends over time."""
+    try:
+        timeline_gen = get_timeline_generator()
+        timeline_data = timeline_gen.generate_timeline(days, granularity)
+        return {
+            "status": "success",
+            "timeline": timeline_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate timeline: {str(e)}")
+
+@app.get("/timeline/frameworks")
+async def get_framework_trends(days: int = 30):
+    """Get framework usage trends over time."""
+    try:
+        timeline_gen = get_timeline_generator()
+        trends = timeline_gen.get_framework_trends(days)
+        return {
+            "status": "success",
+            "trends": trends
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get framework trends: {str(e)}")
+
+@app.post("/query/audits")
+async def query_past_audits(request: dict):
+    """Query past audits using natural language."""
+    try:
+        query = request.get("query", "")
+        if not query:
+            raise HTTPException(status_code=400, detail="Query parameter is required")
+        
+        gpt_conn = get_gpt_connector()
+        result = gpt_conn.query_audits(query)
+        
+        return {
+            "status": "success",
+            "query_result": {
+                "original_query": result.query,
+                "summary": result.summary,
+                "total_matches": result.total_matches,
+                "results": result.results
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+
+@app.post("/explain/issue")
+async def explain_code_issue(request: dict):
+    """Get natural language explanation for a code issue."""
+    try:
+        issue = request.get("issue", "")
+        context = request.get("context", "")
+        
+        if not issue:
+            raise HTTPException(status_code=400, detail="Issue parameter is required")
+        
+        explainer = get_issue_explainer()
+        explanation = explainer.explain_issue(issue, context)
+        
+        return {
+            "status": "success",
+            "explanation": explanation
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Explanation failed: {str(e)}")
 
 @app.get("/privacy-policy")
 async def privacy_policy():
