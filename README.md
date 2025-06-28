@@ -72,6 +72,11 @@ curl -X GET "https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker
 - **Health Check**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/health`
 - **OpenAPI Spec**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/.well-known/openapi.yaml`
 
+### Legal Documents (Required for OpenAI GPT Actions)
+
+- **Privacy Policy**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/privacy-policy`
+- **Terms of Service**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/terms-of-service`
+
 ### Error Responses
 
 #### 401 Unauthorized

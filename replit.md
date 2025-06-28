@@ -90,6 +90,10 @@ Preferred communication style: Simple, everyday language.
 - Authentication module created with secure token validation and timing attack protection
 - New /auth/status endpoint for API key verification
 - OpenAPI spec updated with security schemas for GPT Action compatibility
+- **Legal compliance for OpenAI GPT Actions**: Privacy policy and terms of service documents created
+- Privacy policy endpoint /privacy-policy serving comprehensive data protection information
+- Terms of service endpoint /terms-of-service covering usage rights and responsibilities
+- Both documents designed for OpenAI GPT Actions integration requirements
 
 ## Deployment Status
 
