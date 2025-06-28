@@ -334,9 +334,9 @@ async def get_template_details(template_name: str):
 async def generate_project(request: dict):
     """Generate a complete ML project from template."""
     try:
-        template_name = request.get("template")
+        template_name = request.get("template_name") or request.get("template")
         project_path = request.get("project_path")
-        custom_config = request.get("config", {})
+        custom_config = request.get("custom_config") or request.get("config", {})
         
         if not template_name:
             raise HTTPException(status_code=400, detail="Template name is required")
