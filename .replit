@@ -2,7 +2,7 @@ modules = ["python-3.11", "nodejs-20"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["cargo", "libiconv", "libxcrypt", "libyaml", "rustc"]
+packages = ["cargo", "libiconv", "libxcrypt", "libyaml", "rustc", "zip"]
 
 [workflows]
 runButton = "Project"
