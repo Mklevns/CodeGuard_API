@@ -176,6 +176,13 @@ Preferred communication style: Simple, everyday language.
 - Successfully tested PyTorch, TensorFlow, and RL Gym template generation with custom configuration merging
 - All 10 ML framework templates implemented with comprehensive file structures and setup instructions
 - Project generation API endpoints functional: `/templates`, `/templates/{name}`, `/templates/generate`
+- **ChatGPT Integration**: AI-powered code improvement system implemented with three new endpoints:
+  - `/improve/code` - Single file improvement using GPT-4o for implementing CodeGuard suggestions
+  - `/improve/project` - Batch improvement of multiple files with comprehensive AI analysis
+  - `/audit-and-improve` - Combined endpoint performing full audit plus AI improvements in one call
+- Automatic fallback to auto-fixable improvements when OpenAI API key not configured
+- AI system applies security fixes, adds missing seeding, improves error handling, and enforces ML/RL best practices
+- Successfully tested with confidence scores, applied fixes tracking, and comprehensive improvement summaries
 
 ## Deployment Status
 
@@ -196,6 +203,9 @@ Preferred communication style: Simple, everyday language.
 - `/templates/{name}` - Get template details
 - `/templates/generate` - Create new ML project from template
 - `/templates/preview` - Preview project structure before creation
+- `/improve/code` - AI-powered single file code improvement
+- `/improve/project` - AI-powered multi-file project improvement
+- `/audit-and-improve` - Combined audit and AI improvement in one call
 - `/docs` - Interactive API documentation 
 - `/health` - Service health check
 - `/.well-known/openapi.yaml` - OpenAPI spec for GPT Actions

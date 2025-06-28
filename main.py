@@ -46,6 +46,9 @@ async def root():
         "description": "Static code analysis service for ML/RL Python code",
         "endpoints": {
             "audit": "/audit",
+            "improve_code": "/improve/code",
+            "improve_project": "/improve/project", 
+            "audit_and_improve": "/audit-and-improve",
             "openapi": "/.well-known/openapi.yaml",
             "deployment_openapi": "/openapi-deployment.yaml",
             "docs": "/docs",
@@ -607,14 +610,17 @@ async def audit_and_improve_combined(request: AuditRequest):
             elif "gym" in all_content:
                 framework = "gym"
         
-        telemetry_collector.record_audit_session(
-            session_id=session_id,
-            files_count=len(request.files),
-            issues_found=len(audit_response.issues),
-            processing_time=processing_time,
-            framework=framework,
-            total_fixes=len(audit_response.fixes) + total_ai_fixes
-        )
+        # Record telemetry (skip if errors occur to avoid blocking)
+        try:
+            telemetry_collector.record_audit_session({
+                'session_id': session_id,
+                'file_count': len(request.files),
+                'total_issues': len(audit_response.issues),
+                'analysis_time_ms': processing_time * 1000,
+                'framework_detected': framework
+            })
+        except Exception:
+            pass  # Don't let telemetry errors block the response
         
         return {
             "audit_results": {
