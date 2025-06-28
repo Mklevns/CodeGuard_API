@@ -174,6 +174,11 @@ Preferred communication style: Simple, everyday language.
 - **June 28, 2025**: Multi-AI provider integration completed with OpenAI, Gemini, and Claude support
 - VS Code extension enhanced with AI provider selection settings and individual API key configuration
 - Backend supports automatic fallback between AI providers for maximum reliability
+- **June 28, 2025**: Bulk fix functionality implemented - can now fix all instances of each issue type at once
+- Added async timeout optimization (25s backend, 35s frontend) to resolve ChatGPT timeout issues
+- Enhanced targeted fix application to properly replace specific code sections instead of entire files
+- New bulk fix API endpoint `/improve/bulk-fix` for fixing multiple instances of the same issue type
+- VS Code extension now includes "Fix All Issues by Type" command with progress tracking and preview options
 - **June 28, 2025**: ChatGPT integration fully operational with OpenAI API key configured
 - OpenAI API key successfully added to environment for AI-powered code improvements
 - VS Code extension updated to v0.2.0 with individual fix selection and ChatGPT integration commands
