@@ -8,9 +8,8 @@ info:
   license:
     name: MIT
 servers:
-  - url: https://YOUR-CLOUD-RUN-URL.run.app
-    description: Production Cloud Run deployment
-    # Replace YOUR-CLOUD-RUN-URL with your actual deployment URL
+  - url: https://codeguard-api.replit.app
+    description: Production deployment
 paths:
   /audit:
     post:
