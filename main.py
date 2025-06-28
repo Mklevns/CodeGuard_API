@@ -14,6 +14,7 @@ from gpt_connector import get_gpt_connector, get_issue_explainer
 from project_templates import MLProjectGenerator
 from chatgpt_integration import get_code_improver, get_batch_improver, CodeImprovementRequest
 from multi_ai_integration import get_multi_ai_manager
+from ml_performance_heatmap import heatmap_api, HeatmapConfig
 import uuid
 import time
 

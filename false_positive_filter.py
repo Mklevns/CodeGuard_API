@@ -61,13 +61,17 @@ class FalsePositiveFilter:
                     filtered_issues.append(issue)
                     continue
                 
-                # Filter common false positive patterns
-                if 'imported but unused' in description_lower:
-                    # Simple check for dynamic usage patterns
-                    if self._check_for_dynamic_usage(issue, code_files):
-                        continue  # Skip this issue (likely false positive)
+                # Skip common false positive patterns
+                skip_patterns = [
+                    'line too long',  # Formatting issues are low priority
+                    'missing whitespace',  # Style issues
+                    'too many blank lines',  # Style issues
+                ]
                 
-                # Keep all other issues for now
+                if any(pattern in description_lower for pattern in skip_patterns):
+                    continue  # Skip these common style issues
+                
+                # Keep all other issues
                 filtered_issues.append(issue)
             
             # Filter corresponding fixes
@@ -298,6 +302,28 @@ Respond with JSON: {{"valid_indices": [list of valid issue indices]}}"""
             print(f"Quick validation failed: {e}")
         
         return issues
+    
+    def _check_for_dynamic_usage(self, issue: Issue, code_files: List[CodeFile]) -> bool:
+        """Quick check if an import might be used dynamically."""
+        try:
+            # Extract import name from issue description
+            if "'" not in issue.description:
+                return False
+            
+            import_name = issue.description.split("'")[1]
+            
+            # Find code file
+            filename = getattr(issue, 'filename', '')
+            for file in code_files:
+                if file.filename == filename:
+                    # Quick pattern check for dynamic usage
+                    content_lower = file.content.lower()
+                    return any(pattern in content_lower for pattern in [
+                        'eval(', 'exec(', 'getattr(', f'"{import_name}"', f"'{import_name}'"
+                    ])
+            return False
+        except Exception:
+            return False
     
     def _has_dynamic_usage_patterns(self, issue: Issue, code_files: List[CodeFile]) -> bool:
         """Check if an 'unused' import might actually be used dynamically."""
