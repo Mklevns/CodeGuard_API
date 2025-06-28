@@ -44,6 +44,9 @@ function activate(context) {
     const bulkFixCommand = vscode.commands.registerCommand('codeguard.bulkFixByType', async () => {
         await showBulkFixMenu();
     });
+    const generateImprovementReportCommand = vscode.commands.registerCommand('codeguard.generateImprovementReport', async () => {
+        await generateComprehensiveReport();
+    });
     // Register event listeners
     const onSaveListener = vscode.workspace.onDidSaveTextDocument(async (document) => {
         if (document.languageId === 'python' && configManager.getAuditOnSave()) {
@@ -235,6 +238,60 @@ async function showFixSelectionMenu() {
     if (selected) {
         // Apply ChatGPT fix for this specific issue
         await applySpecificChatGPTFix(selected.diagnostic);
+    }
+}
+async function generateComprehensiveReport() {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        vscode.window.showErrorMessage('No active Python file');
+        return;
+    }
+    if (!editor.document.fileName.endsWith('.py')) {
+        vscode.window.showErrorMessage('CodeGuard only supports Python files');
+        return;
+    }
+    try {
+        // Show format selection
+        const format = await vscode.window.showQuickPick(['Markdown', 'HTML', 'JSON'], { placeHolder: 'Select report format' });
+        if (!format)
+            return;
+        // Show AI inclusion option
+        const includeAi = await vscode.window.showQuickPick(['Yes', 'No'], { placeHolder: 'Include AI improvement suggestions?' });
+        if (!includeAi)
+            return;
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Generating comprehensive improvement report...",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ increment: 20, message: "Analyzing code..." });
+            const files = [{
+                    filename: editor.document.fileName.split('/').pop() || 'unknown.py',
+                    content: editor.document.getText()
+                }];
+            progress.report({ increment: 40, message: "Running analysis tools..." });
+            const reportData = await api.generateImprovementReport(files, format.toLowerCase(), includeAi === 'Yes');
+            progress.report({ increment: 80, message: "Formatting report..." });
+            // Create and show the report
+            const reportDoc = await vscode.workspace.openTextDocument({
+                content: typeof reportData.report === 'string' ? reportData.report : JSON.stringify(reportData.report, null, 2),
+                language: format.toLowerCase() === 'markdown' ? 'markdown' :
+                    format.toLowerCase() === 'html' ? 'html' : 'json'
+            });
+            await vscode.window.showTextDocument(reportDoc);
+            progress.report({ increment: 100, message: "Report generated!" });
+            // Show summary
+            const summary = `Report Generated:
+• ${reportData.total_files} files analyzed
+• ${reportData.total_issues} issues found
+• ${reportData.severity_breakdown?.error || 0} errors
+• ${reportData.severity_breakdown?.warning || 0} warnings
+• AI suggestions: ${reportData.ai_suggestions_included ? 'Included' : 'Not included'}`;
+            vscode.window.showInformationMessage(summary);
+        });
+    }
+    catch (error) {
+        vscode.window.showErrorMessage(`Report generation failed: ${error.message}`);
     }
 }
 async function applySpecificChatGPTFix(diagnostic) {

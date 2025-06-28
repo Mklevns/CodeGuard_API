@@ -51,6 +51,11 @@
         "command": "codeguard.bulkFixByType",
         "title": "CodeGuard: Fix All Issues by Type",
         "icon": "$(symbol-operator)"
+      },
+      {
+        "command": "codeguard.generateImprovementReport",
+        "title": "CodeGuard: Generate Comprehensive Report",
+        "icon": "$(file-text)"
       }
     ],
     "menus": {
@@ -73,6 +78,11 @@
         {
           "when": "resourceExtname == .py",
           "command": "codeguard.bulkFixByType",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceExtname == .py",
+          "command": "codeguard.generateImprovementReport",
           "group": "navigation"
         }
       ]

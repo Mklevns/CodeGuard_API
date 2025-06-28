@@ -147,6 +147,16 @@ class CodeGuardAPI {
         });
         return response.data;
     }
+    async generateImprovementReport(files, format = 'markdown', includeAi = true) {
+        const response = await this.client.post('/reports/improvement-analysis', {
+            files: files.map(f => ({ filename: f.filename, content: f.content })),
+            format: format,
+            include_ai_suggestions: includeAi
+        }, {
+            timeout: 60000 // Extended timeout for comprehensive analysis
+        });
+        return response.data;
+    }
     async auditAndImprove(files, options) {
         const requestData = {
             files,
