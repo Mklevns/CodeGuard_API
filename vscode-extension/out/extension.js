@@ -273,11 +273,8 @@ async function applySpecificChatGPTFix(diagnostic) {
                 await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
             }
             else if (apply === 'Apply Fix') {
-                // Apply the fix
-                const edit = new vscode.WorkspaceEdit();
-                const fullRange = new vscode.Range(0, 0, activeEditor.document.lineCount, 0);
-                edit.replace(activeEditor.document.uri, fullRange, improvement.improved_code);
-                await vscode.workspace.applyEdit(edit);
+                // Apply the fix using targeted replacement
+                await applyTargetedFix(activeEditor, improvement, diagnostic);
                 // Clear the specific diagnostic
                 diagnosticsManager.clearSpecificDiagnostic(activeEditor.document.uri, diagnostic);
                 vscode.window.showInformationMessage('ChatGPT fix applied successfully');
@@ -286,6 +283,53 @@ async function applySpecificChatGPTFix(diagnostic) {
     }
     catch (error) {
         vscode.window.showErrorMessage(`Failed to apply ChatGPT fix: ${error}`);
+    }
+}
+async function applyTargetedFix(editor, improvement, diagnostic) {
+    try {
+        const originalLines = editor.document.getText().split('\n');
+        const improvedLines = improvement.improved_code.split('\n');
+        // Find the difference and apply only the changed lines
+        const lineNumber = diagnostic.range.start.line;
+        // Check if we can apply a line-specific fix
+        if (improvedLines.length === originalLines.length) {
+            // Line count matches - replace only changed lines around the issue
+            const startLine = Math.max(0, lineNumber - 2);
+            const endLine = Math.min(originalLines.length - 1, lineNumber + 2);
+            let hasChanges = false;
+            for (let i = startLine; i <= endLine; i++) {
+                if (originalLines[i] !== improvedLines[i]) {
+                    hasChanges = true;
+                    break;
+                }
+            }
+            if (hasChanges) {
+                const edit = new vscode.WorkspaceEdit();
+                const range = new vscode.Range(startLine, 0, endLine + 1, 0);
+                const replacementText = improvedLines.slice(startLine, endLine + 1).join('\n') + '\n';
+                edit.replace(editor.document.uri, range, replacementText);
+                await vscode.workspace.applyEdit(edit);
+                return;
+            }
+        }
+        // Fallback: show diff and let user decide
+        const action = await vscode.window.showWarningMessage('This fix requires significant changes. Review before applying.', 'Show Diff', 'Replace All', 'Cancel');
+        if (action === 'Show Diff') {
+            const doc = await vscode.workspace.openTextDocument({
+                content: improvement.improved_code,
+                language: 'python'
+            });
+            await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+        }
+        else if (action === 'Replace All') {
+            const edit = new vscode.WorkspaceEdit();
+            const fullRange = new vscode.Range(0, 0, editor.document.lineCount, 0);
+            edit.replace(editor.document.uri, fullRange, improvement.improved_code);
+            await vscode.workspace.applyEdit(edit);
+        }
+    }
+    catch (error) {
+        vscode.window.showErrorMessage(`Failed to apply targeted fix: ${error}`);
     }
 }
 function deactivate() {

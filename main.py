@@ -481,11 +481,102 @@ async def improve_code_with_ai(request: dict):
             "confidence_score": response.confidence_score,
             "warnings": response.warnings,
             "original_issues_count": len(issues),
-            "fixes_applied_count": len(response.applied_fixes)
+            "fixes_applied_count": len(response.applied_fixes),
+            "fix_categories": _categorize_fixes_by_type(issues)
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Code improvement failed: {str(e)}")
+
+def _categorize_fixes_by_type(issues):
+    """Categorize issues by type for bulk fixing"""
+    categories = {}
+    for issue in issues:
+        issue_type = issue.get("type", "unknown")
+        if issue_type not in categories:
+            categories[issue_type] = {
+                "count": 0,
+                "lines": [],
+                "description": issue.get("description", ""),
+                "severity": issue.get("severity", "warning")
+            }
+        categories[issue_type]["count"] += 1
+        categories[issue_type]["lines"].append(issue.get("line", 0))
+    return categories
+
+@app.post("/improve/bulk-fix")
+async def apply_bulk_fixes(request: dict):
+    """
+    Apply all fixes of a specific type using AI.
+    Allows bulk fixing of similar issues across the codebase.
+    """
+    try:
+        original_code = request.get("original_code", "")
+        filename = request.get("filename", "code.py")
+        fix_type = request.get("fix_type", "")
+        issues = request.get("issues", [])
+        ai_provider = request.get("ai_provider", "openai")
+        ai_api_key = request.get("ai_api_key")
+        
+        if not original_code or not fix_type:
+            raise HTTPException(status_code=400, detail="Code content and fix type are required")
+        
+        # Filter issues by the specified type
+        filtered_issues = [issue for issue in issues if issue.get("type") == fix_type]
+        
+        if not filtered_issues:
+            return {
+                "improved_code": original_code,
+                "applied_fixes": [],
+                "improvement_summary": f"No issues of type '{fix_type}' found",
+                "confidence_score": 1.0,
+                "warnings": [],
+                "fixed_lines": []
+            }
+        
+        # Create focused improvement request for this fix type
+        from models import Issue, Fix
+        issue_objects = [
+            Issue(
+                filename=issue.get("filename", filename),
+                line=issue.get("line", 1),
+                type=issue.get("type", fix_type),
+                description=issue.get("description", ""),
+                source=issue.get("source", "unknown"),
+                severity=issue.get("severity", "warning")
+            ) for issue in filtered_issues
+        ]
+        
+        improvement_request = CodeImprovementRequest(
+            original_code=original_code,
+            filename=filename,
+            issues=issue_objects,
+            fixes=[],
+            improvement_level="moderate",
+            preserve_functionality=True
+        )
+        
+        # Use multi-AI manager for bulk fixing
+        multi_ai = get_multi_ai_manager()
+        response = await multi_ai.improve_code_with_provider(
+            improvement_request, 
+            provider_name=ai_provider,
+            api_key=ai_api_key
+        )
+        
+        return {
+            "improved_code": response.improved_code,
+            "applied_fixes": response.applied_fixes,
+            "improvement_summary": f"Applied bulk fixes for {len(filtered_issues)} instances of '{fix_type}': {response.improvement_summary}",
+            "confidence_score": response.confidence_score,
+            "warnings": response.warnings,
+            "fixed_lines": [issue.get("line") for issue in filtered_issues],
+            "fix_type": fix_type,
+            "instances_fixed": len(filtered_issues)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bulk fix failed: {str(e)}")
 
 @app.post("/improve/project")
 async def improve_entire_project(request: dict):
