@@ -35,6 +35,7 @@ async def root():
         "endpoints": {
             "audit": "/audit",
             "openapi": "/.well-known/openapi.yaml",
+            "deployment_openapi": "/openapi-deployment.yaml",
             "docs": "/docs",
             "privacy": "/privacy-policy",
             "terms": "/terms-of-service"
@@ -69,6 +70,15 @@ async def get_openapi_spec():
         return FileResponse(openapi_path, media_type="application/yaml")
     else:
         raise HTTPException(status_code=404, detail="OpenAPI specification not found")
+
+@app.get("/openapi-deployment.yaml")
+async def get_deployment_openapi_spec():
+    """Serve the deployment OpenAPI specification for production use."""
+    openapi_path = "openapi-deployment.yaml"
+    if os.path.exists(openapi_path):
+        return FileResponse(openapi_path, media_type="application/yaml")
+    else:
+        raise HTTPException(status_code=404, detail="Deployment OpenAPI specification not found")
 
 @app.get("/auth/status")
 async def auth_status(current_user: dict = Depends(get_current_user)):
