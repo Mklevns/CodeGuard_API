@@ -167,6 +167,10 @@ Preferred communication style: Simple, everyday language.
 - Extension features: Inline diagnostics, quick-fix suggestions, secure API key storage, framework detection
 - Full IDE integration with context menus, progress indicators, and auto-analysis on save
 - Supports project-level configuration via .codeguardrc.json files
+- **One-Click Environment Setup**: Complete ML project template system with 10 framework templates
+- Project templates: PyTorch, TensorFlow, RL Gym, Stable-Baselines3, JAX, scikit-learn, Data Science, Computer Vision, NLP, MLOps
+- Automated project generation with dependencies, configurations, sample code, and setup instructions
+- CLI tool and VS Code integration for seamless project creation with interactive wizards
 
 ## Deployment Status
 
@@ -183,6 +187,10 @@ Preferred communication style: Simple, everyday language.
 - `/timeline/frameworks` - Framework usage trends over time
 - `/query/audits` - Natural language queries for past audit data
 - `/explain/issue` - Context-aware explanations for code issues
+- `/templates` - List all ML project templates
+- `/templates/{name}` - Get template details
+- `/templates/generate` - Create new ML project from template
+- `/templates/preview` - Preview project structure before creation
 - `/docs` - Interactive API documentation 
 - `/health` - Service health check
 - `/.well-known/openapi.yaml` - OpenAPI spec for GPT Actions

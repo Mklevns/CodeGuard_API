@@ -27,6 +27,11 @@
       {
         "command": "codeguard.generateReport",
         "title": "CodeGuard: Generate Report"
+      },
+      {
+        "command": "codeguard.setupProject",
+        "title": "CodeGuard: Setup ML Project",
+        "icon": "$(rocket)"
       }
     ],
     "menus": {

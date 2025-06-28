@@ -139,4 +139,28 @@ export class CodeGuardAPI {
             return false;
         }
     }
+    
+    async getProjectTemplates(): Promise<any[]> {
+        const response = await this.client.get('/templates');
+        return response.data.templates;
+    }
+    
+    async getTemplateDetails(templateName: string): Promise<any> {
+        const response = await this.client.get(`/templates/${templateName}`);
+        return response.data.template;
+    }
+    
+    async previewProject(templateName: string): Promise<any> {
+        const response = await this.client.post('/templates/preview', { template: templateName });
+        return response.data.preview;
+    }
+    
+    async generateProject(templateName: string, projectPath: string, config?: any): Promise<any> {
+        const response = await this.client.post('/templates/generate', {
+            template: templateName,
+            project_path: projectPath,
+            config: config || {}
+        });
+        return response.data.project;
+    }
 }

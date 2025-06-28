@@ -2,10 +2,12 @@ import * as vscode from 'vscode';
 import { CodeGuardAPI } from './api';
 import { DiagnosticsManager } from './diagnostics';
 import { ConfigManager } from './config';
+import { ProjectSetupManager } from './project_setup';
 
 let diagnosticsManager: DiagnosticsManager;
 let api: CodeGuardAPI;
 let configManager: ConfigManager;
+let projectSetupManager: ProjectSetupManager;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('CodeGuard extension is now active!');
@@ -14,6 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
     configManager = new ConfigManager(context);
     api = new CodeGuardAPI(configManager);
     diagnosticsManager = new DiagnosticsManager();
+    projectSetupManager = new ProjectSetupManager(api);
     
     // Register commands
     const runAuditCommand = vscode.commands.registerCommand('codeguard.runAudit', async () => {
@@ -29,6 +32,10 @@ export function activate(context: vscode.ExtensionContext) {
         await generateReport();
     });
     
+    const setupProjectCommand = vscode.commands.registerCommand('codeguard.setupProject', async () => {
+        await projectSetupManager.showProjectTemplates();
+    });
+    
     // Register event listeners
     const onSaveListener = vscode.workspace.onDidSaveTextDocument(async (document) => {
         if (document.languageId === 'python' && configManager.getAuditOnSave()) {
@@ -41,6 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
         runAuditCommand,
         clearDiagnosticsCommand,
         generateReportCommand,
+        setupProjectCommand,
         onSaveListener,
         diagnosticsManager.diagnosticCollection
     );

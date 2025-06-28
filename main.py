@@ -11,6 +11,7 @@ from telemetry import telemetry_collector, metrics_analyzer
 from dashboard import get_dashboard
 from historical_timeline import get_timeline_generator
 from gpt_connector import get_gpt_connector, get_issue_explainer
+from project_templates import MLProjectGenerator
 import uuid
 import time
 
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize project generator
+project_generator = MLProjectGenerator()
 
 @app.get("/")
 async def root():
@@ -298,6 +302,93 @@ async def explain_code_issue(request: dict):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Explanation failed: {str(e)}")
+
+@app.get("/templates")
+async def list_project_templates():
+    """List all available ML/RL project templates."""
+    try:
+        templates = project_generator.list_templates()
+        return {
+            "status": "success",
+            "templates": templates,
+            "total_count": len(templates)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list templates: {str(e)}")
+
+@app.get("/templates/{template_name}")
+async def get_template_details(template_name: str):
+    """Get detailed information about a specific project template."""
+    try:
+        details = project_generator.get_template_details(template_name)
+        return {
+            "status": "success",
+            "template": details
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get template details: {str(e)}")
+
+@app.post("/templates/generate")
+async def generate_project(request: dict):
+    """Generate a complete ML project from template."""
+    try:
+        template_name = request.get("template")
+        project_path = request.get("project_path")
+        custom_config = request.get("config", {})
+        
+        if not template_name:
+            raise HTTPException(status_code=400, detail="Template name is required")
+        if not project_path:
+            raise HTTPException(status_code=400, detail="Project path is required")
+        
+        result = project_generator.generate_project(
+            template_name=template_name,
+            project_path=project_path,
+            custom_config=custom_config
+        )
+        
+        return {
+            "status": "success",
+            "project": result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate project: {str(e)}")
+
+@app.post("/templates/preview")
+async def preview_project_structure(request: dict):
+    """Preview what files and directories would be created for a template."""
+    try:
+        template_name = request.get("template")
+        
+        if not template_name:
+            raise HTTPException(status_code=400, detail="Template name is required")
+        
+        details = project_generator.get_template_details(template_name)
+        
+        # Generate requirements preview
+        template_obj = project_generator.templates[template_name]
+        requirements_content = project_generator._generate_requirements(template_obj)
+        
+        return {
+            "status": "success",
+            "preview": {
+                "template_name": details["name"],
+                "framework": details["framework"],
+                "files_to_create": details["files"],
+                "directories_to_create": details["directories"],
+                "dependencies_count": len(details["dependencies"]),
+                "setup_commands": details["setup_commands"],
+                "requirements_preview": requirements_content.split('\n')[:10]  # First 10 lines
+            }
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to preview project: {str(e)}")
 
 @app.get("/privacy-policy")
 async def privacy_policy():
