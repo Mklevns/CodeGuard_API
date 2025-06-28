@@ -228,11 +228,11 @@ class BatchCodeImprover:
             # Extract issues and fixes for this specific file
             file_issues = [
                 issue for issue in audit_results.get("issues", [])
-                if issue.file == file.filename
+                if hasattr(issue, 'filename') and issue.filename == file.filename
             ]
             file_fixes = [
                 fix for fix in audit_results.get("fixes", [])
-                if fix.file == file.filename
+                if hasattr(fix, 'filename') and fix.filename == file.filename
             ]
             
             if file_issues or file_fixes:
