@@ -1,5 +1,14 @@
 import * as vscode from 'vscode';
 
+interface CodeGuardConfig {
+    serverUrl: string;
+    apiKey: string;
+    analysisLevel: string;
+    autoAnalysisOnSave: boolean;
+    enableFalsePositiveFiltering: boolean;
+    aiProvider: string;
+}
+
 export class ConfigManager {
     private context: vscode.ExtensionContext;
     private static readonly API_KEY_SECRET = 'codeguard.apiKey';

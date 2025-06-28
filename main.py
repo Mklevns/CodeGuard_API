@@ -78,7 +78,7 @@ async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
     
     Args:
         request: AuditRequest containing files to analyze
-        current_user: Authenticated user information
+        validate_with_ai: Whether to apply ChatGPT false positive filtering
         
     Returns:
         AuditResponse with summary, issues, and fix suggestions
@@ -93,8 +93,10 @@ async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
         # Analyze request for telemetry
         request_analysis = metrics_analyzer.analyze_request(request)
         
-        # Perform code analysis
-        response = analyze_code(request)
+        # Perform code analysis with configurable AI validation
+        from enhanced_audit import EnhancedAuditEngine
+        engine = EnhancedAuditEngine(use_false_positive_filter=validate_with_ai)
+        response = engine.analyze_code(request)
         
         # Calculate analysis time
         analysis_time = (time.time() - start_time) * 1000  # Convert to ms

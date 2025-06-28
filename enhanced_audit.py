@@ -19,9 +19,10 @@ from false_positive_filter import get_false_positive_filter
 class EnhancedAuditEngine:
     """Enhanced audit engine with multiple static analysis tools."""
     
-    def __init__(self):
+    def __init__(self, use_false_positive_filter: bool = True):
         self.ml_rl_engine = MLRLRuleEngine()
         self.custom_rule_engine = CustomRuleEngine()
+        self.use_false_positive_filter = use_false_positive_filter
         self.tools = {
             'flake8': self._run_flake8,
             'pylint': self._run_pylint,
@@ -91,11 +92,19 @@ class EnhancedAuditEngine:
                         severity="warning"
                     ))
         
-        # Apply false positive filtering using ChatGPT
-        false_positive_filter = get_false_positive_filter()
-        validated_issues, validated_fixes = false_positive_filter.filter_issues(
-            all_issues, all_fixes, request.files
-        )
+        # Apply false positive filtering using ChatGPT if enabled
+        if self.use_false_positive_filter:
+            false_positive_filter = get_false_positive_filter()
+            validated_issues, validated_fixes = false_positive_filter.filter_issues(
+                all_issues, all_fixes, request.files
+            )
+            
+            # Add false positive filter status to summary
+            filtered_count = len(all_issues) - len(validated_issues)
+            filter_status = f" - {filtered_count} potential false positives filtered" if filtered_count > 0 else ""
+        else:
+            validated_issues, validated_fixes = all_issues, all_fixes
+            filter_status = ""
         
         # Generate summary with validated results
         issue_count = len(validated_issues)
@@ -110,10 +119,7 @@ class EnhancedAuditEngine:
         else:
             summary = f"{issue_count} issues found across {file_count} files"
         
-        # Add false positive filter status to summary
-        filtered_count = len(all_issues) - len(validated_issues)
-        if filtered_count > 0:
-            summary += f" - {filtered_count} potential false positives filtered"
+        summary += filter_status
         
         return AuditResponse(
             summary=summary,
