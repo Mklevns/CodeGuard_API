@@ -8,10 +8,9 @@ info:
   license:
     name: MIT
 servers:
-  - url: https://CodeGuard.replit.app
+  - url: https://YOUR-CLOUD-RUN-URL.run.app
     description: Production Cloud Run deployment
-  - url: http://localhost:8080
-    description: Local production server
+    # Replace YOUR-CLOUD-RUN-URL with your actual deployment URL
 paths:
   /audit:
     post:
