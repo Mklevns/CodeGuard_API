@@ -6,7 +6,7 @@ class CodeGuardAPI {
     constructor(configManager) {
         this.configManager = configManager;
         this.client = axios_1.default.create({
-            timeout: 30000,
+            timeout: 60000, // Increased timeout for ChatGPT false positive filtering
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -44,8 +44,28 @@ class CodeGuardAPI {
                 target: options?.target || 'gpu'
             }
         };
-        const response = await this.client.post('/audit', requestData);
-        return response.data;
+        // Use appropriate endpoint based on false positive filtering setting
+        const useFalsePositiveFiltering = this.configManager.getFalsePositiveFiltering();
+        const endpoint = useFalsePositiveFiltering ? '/audit' : '/audit/no-filter';
+        // Get user-configured timeout for false positive filtering
+        const falsePositiveTimeout = this.configManager.getFalsePositiveTimeout();
+        const timeout = useFalsePositiveFiltering ? falsePositiveTimeout * 1000 : 30000;
+        try {
+            const response = await this.client.post(endpoint, requestData, { timeout });
+            return response.data;
+        }
+        catch (error) {
+            // If timeout with false positive filtering enabled, try without filtering
+            if (error.code === 'ECONNABORTED' && useFalsePositiveFiltering) {
+                console.log(`AI filtering timed out after ${falsePositiveTimeout}s, retrying without filtering...`);
+                const fallbackResponse = await this.client.post('/audit/no-filter', requestData, { timeout: 30000 });
+                return {
+                    ...fallbackResponse.data,
+                    summary: fallbackResponse.data.summary + ' (AI filtering timed out - using standard analysis)'
+                };
+            }
+            throw error;
+        }
     }
     async getRulesSummary() {
         const response = await this.client.get('/rules/summary');
@@ -147,11 +167,12 @@ class CodeGuardAPI {
         });
         return response.data;
     }
-    async generateImprovementReport(files, format = 'markdown', includeAi = true) {
+    async generateImprovementReport(files, format = 'markdown', includeAi = true, applyFiltering = true) {
         const response = await this.client.post('/reports/improvement-analysis', {
             files: files.map(f => ({ filename: f.filename, content: f.content })),
             format: format,
-            include_ai_suggestions: includeAi
+            include_ai_suggestions: includeAi,
+            apply_false_positive_filtering: applyFiltering
         }, {
             timeout: 60000 // Extended timeout for comprehensive analysis
         });

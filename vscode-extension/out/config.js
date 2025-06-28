@@ -30,6 +30,18 @@ class ConfigManager {
         const config = vscode.workspace.getConfiguration('codeguard');
         return config.get('auditOnSave') ?? true;
     }
+    getFalsePositiveFiltering() {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get('enableFalsePositiveFiltering') ?? true;
+    }
+    async setFalsePositiveFiltering(enabled) {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        await config.update('enableFalsePositiveFiltering', enabled, vscode.ConfigurationTarget.Global);
+    }
+    getFalsePositiveTimeout() {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get('falsePositiveTimeout') ?? 45;
+    }
     getIgnoreRules() {
         const config = vscode.workspace.getConfiguration('codeguard');
         return config.get('ignoreRules') || [];

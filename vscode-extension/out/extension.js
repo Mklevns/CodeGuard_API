@@ -259,6 +259,10 @@ async function generateComprehensiveReport() {
         const includeAi = await vscode.window.showQuickPick(['Yes', 'No'], { placeHolder: 'Include AI improvement suggestions?' });
         if (!includeAi)
             return;
+        // Show filtering option
+        const applyFiltering = await vscode.window.showQuickPick(['Yes - Filter out style issues', 'No - Show all issues'], { placeHolder: 'Apply false positive filtering?' });
+        if (!applyFiltering)
+            return;
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: "Generating comprehensive improvement report...",
@@ -270,7 +274,7 @@ async function generateComprehensiveReport() {
                     content: editor.document.getText()
                 }];
             progress.report({ increment: 40, message: "Running analysis tools..." });
-            const reportData = await api.generateImprovementReport(files, format.toLowerCase(), includeAi === 'Yes');
+            const reportData = await api.generateImprovementReport(files, format.toLowerCase(), includeAi === 'Yes', applyFiltering.startsWith('Yes'));
             progress.report({ increment: 80, message: "Formatting report..." });
             // Create and show the report
             const reportDoc = await vscode.workspace.openTextDocument({

@@ -624,6 +624,7 @@ async def generate_improvement_report(request: dict):
         files = request.get("files", [])
         include_ai_suggestions = request.get("include_ai_suggestions", True)
         report_format = request.get("format", "markdown")  # markdown, json, html
+        apply_filtering = request.get("apply_false_positive_filtering", True)  # Filter out common false positives
         
         if not files:
             raise HTTPException(status_code=400, detail="Files are required for analysis")
@@ -638,16 +639,35 @@ async def generate_improvement_report(request: dict):
             }
         }
         
-        # Use the existing audit engine directly
+        # Use the existing audit engine with false positive filtering
         from enhanced_audit import EnhancedAuditEngine
         from models import AuditRequest, CodeFile, AuditOptions
+        from false_positive_filter import get_false_positive_filter
         
-        audit_engine = EnhancedAuditEngine()
+        audit_engine = EnhancedAuditEngine(use_false_positive_filter=True)
         audit_request = AuditRequest(
             files=[CodeFile(filename=f["filename"], content=f["content"]) for f in files],
             options=AuditOptions(level="strict", framework="general", target="general")
         )
+        
+        # Get raw audit results
         audit_response = audit_engine.analyze_code(audit_request)
+        
+        # Apply false positive filtering if requested (uses fast rule-based filtering, no ChatGPT calls)
+        if apply_filtering:
+            false_positive_filter = get_false_positive_filter()
+            filtered_issues, filtered_fixes = false_positive_filter.filter_issues(
+                audit_response.issues, 
+                audit_response.fixes, 
+                audit_request.files
+            )
+            
+            # Update audit response with filtered results
+            audit_response.issues = filtered_issues
+            audit_response.fixes = filtered_fixes
+            audit_response.summary = f"Found {len(filtered_issues)} issues across {len(files)} files (after filtering)"
+        else:
+            audit_response.summary = f"Found {len(audit_response.issues)} issues across {len(files)} files (unfiltered)"
         
         # Generate AI improvement suggestions if requested
         ai_suggestions = {}

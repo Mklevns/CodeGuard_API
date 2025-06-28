@@ -234,11 +234,12 @@ export class CodeGuardAPI {
         return response.data;
     }
 
-    async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true): Promise<any> {
+    async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
         const response = await this.client.post('/reports/improvement-analysis', {
             files: files.map(f => ({ filename: f.filename, content: f.content })),
             format: format,
-            include_ai_suggestions: includeAi
+            include_ai_suggestions: includeAi,
+            apply_false_positive_filtering: applyFiltering
         }, {
             timeout: 60000  // Extended timeout for comprehensive analysis
         });
