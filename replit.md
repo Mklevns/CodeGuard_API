@@ -106,6 +106,9 @@ Preferred communication style: Simple, everyday language.
 - **OpenAPI deployment endpoint added**: Created `/openapi-deployment.yaml` endpoint to serve production OpenAPI spec
 - Fixed 404 errors for users accessing OpenAPI specification from deployed application
 - API key authentication fully functional and tested with production security enabled
+- **Deployment crash fixes applied**: Created simplified `main_production.py` entry point for reliable Cloud Run deployment
+- Fixed exit status 126 errors by ensuring proper file permissions and simplified startup process
+- Updated startup script to use minimal configuration for better deployment reliability
 
 ## Deployment Status
 
