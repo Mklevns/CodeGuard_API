@@ -177,6 +177,8 @@ export class CodeGuardAPI {
             preserve_functionality: true,
             ai_provider: aiProvider,
             ai_api_key: aiApiKey
+        }, {
+            timeout: 35000  // Extended timeout for async AI processing
         });
         return response.data;
     }

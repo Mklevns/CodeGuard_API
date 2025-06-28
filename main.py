@@ -468,7 +468,7 @@ async def improve_code_with_ai(request: dict):
             preserve_functionality=True
         )
         
-        response = multi_ai.improve_code_with_provider(
+        response = await multi_ai.improve_code_with_provider(
             improvement_request, 
             provider_name=ai_provider,
             api_key=ai_api_key

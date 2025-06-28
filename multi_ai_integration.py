@@ -16,50 +16,68 @@ class MultiAIManager:
     def __init__(self):
         self.chatgpt_improver = ChatGPTCodeImprover()
     
-    def improve_code_with_provider(
+    async def improve_code_with_provider(
         self, 
         request: CodeImprovementRequest, 
         provider_name: str = "openai",
         api_key: Optional[str] = None
     ) -> CodeImprovementResponse:
-        """Improve code using specified AI provider with fast response optimization"""
+        """Improve code using specified AI provider with async optimization"""
         
         # Use OpenAI implementation with custom API key if provided
         if provider_name == "openai" or not provider_name:
-            return self._improve_with_openai(request, api_key)
+            return await self._improve_with_openai_async(request, api_key)
         
         # Fallback for other providers
         return self._fallback_improvement(request, provider_name)
     
-    def _improve_with_openai(self, request: CodeImprovementRequest, api_key: Optional[str]) -> CodeImprovementResponse:
-        """Optimized OpenAI improvement with custom API key support"""
-        if api_key:
-            # Temporarily set custom API key
-            original_key = os.environ.get("OPENAI_API_KEY")
-            os.environ["OPENAI_API_KEY"] = api_key
-            try:
-                response = self.chatgpt_improver.improve_code(request)
-                # Add provider info to response
-                response.applied_fixes.append({"provider": "openai", "custom_key": True})
-                return response
-            except Exception as e:
-                logging.error(f"OpenAI with custom key failed: {e}")
-                return self._fallback_improvement(request, "openai")
-            finally:
-                # Restore original key
-                if original_key:
-                    os.environ["OPENAI_API_KEY"] = original_key
-                elif "OPENAI_API_KEY" in os.environ:
-                    del os.environ["OPENAI_API_KEY"]
-        else:
-            # Use existing configuration
-            try:
-                response = self.chatgpt_improver.improve_code(request)
-                response.applied_fixes.append({"provider": "openai", "environment_key": True})
-                return response
-            except Exception as e:
-                logging.error(f"OpenAI with environment key failed: {e}")
-                return self._fallback_improvement(request, "openai")
+    async def _improve_with_openai_async(self, request: CodeImprovementRequest, api_key: Optional[str]) -> CodeImprovementResponse:
+        """Async OpenAI improvement with timeout optimization"""
+        import asyncio
+        
+        def run_improvement():
+            if api_key:
+                # Temporarily set custom API key
+                original_key = os.environ.get("OPENAI_API_KEY")
+                os.environ["OPENAI_API_KEY"] = api_key
+                try:
+                    response = self.chatgpt_improver.improve_code(request)
+                    response.applied_fixes.append({"provider": "openai", "custom_key": True})
+                    return response
+                except Exception as e:
+                    logging.error(f"OpenAI with custom key failed: {e}")
+                    return self._fallback_improvement(request, "openai")
+                finally:
+                    # Restore original key
+                    if original_key:
+                        os.environ["OPENAI_API_KEY"] = original_key
+                    elif "OPENAI_API_KEY" in os.environ:
+                        del os.environ["OPENAI_API_KEY"]
+            else:
+                # Use existing configuration
+                try:
+                    response = self.chatgpt_improver.improve_code(request)
+                    response.applied_fixes.append({"provider": "openai", "environment_key": True})
+                    return response
+                except Exception as e:
+                    logging.error(f"OpenAI with environment key failed: {e}")
+                    return self._fallback_improvement(request, "openai")
+        
+        # Run with timeout to prevent hanging
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(run_improvement), 
+                timeout=25.0  # 25 second timeout to prevent 30s client timeout
+            )
+        except asyncio.TimeoutError:
+            logging.error("OpenAI request timed out after 25 seconds")
+            return CodeImprovementResponse(
+                improved_code=request.original_code,
+                applied_fixes=[],
+                improvement_summary="Request timed out - try with shorter code or simpler fixes",
+                confidence_score=0.0,
+                warnings=["AI request exceeded time limit - consider breaking code into smaller sections"]
+            )
     
     def _fallback_improvement(self, request: CodeImprovementRequest, provider: str) -> CodeImprovementResponse:
         """Fast fallback when AI providers are unavailable"""
