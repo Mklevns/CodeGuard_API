@@ -61,6 +61,19 @@ async def root():
 @app.post("/audit", response_model=AuditResponse)
 async def audit_code(request: AuditRequest, current_user: dict = Depends(get_current_user)):
     """
+    Standard audit endpoint - includes ChatGPT false positive filtering by default.
+    """
+    return await _perform_audit(request, validate_with_ai=True)
+
+@app.post("/audit/no-filter", response_model=AuditResponse)
+async def audit_code_no_filter(request: AuditRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Audit endpoint without ChatGPT false positive filtering for debugging.
+    """
+    return await _perform_audit(request, validate_with_ai=False)
+
+async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
+    """
     Analyzes submitted Python code files and returns a report of issues and suggestions.
     
     Args:

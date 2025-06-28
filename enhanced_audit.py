@@ -13,6 +13,7 @@ from models import AuditRequest, AuditResponse, Issue, Fix
 from rule_engine import MLRLRuleEngine
 from rule_loader import CustomRuleEngine
 from rl_environment_plugin import rl_env_analyzer, rl_config_analyzer
+from false_positive_filter import get_false_positive_filter
 
 
 class EnhancedAuditEngine:
@@ -90,23 +91,34 @@ class EnhancedAuditEngine:
                         severity="warning"
                     ))
         
-        # Generate summary
-        issue_count = len(all_issues)
+        # Apply false positive filtering using ChatGPT
+        false_positive_filter = get_false_positive_filter()
+        validated_issues, validated_fixes = false_positive_filter.filter_issues(
+            all_issues, all_fixes, request.files
+        )
+        
+        # Generate summary with validated results
+        issue_count = len(validated_issues)
         file_count = len(request.files)
         
         # Count issues by severity
-        error_count = len([i for i in all_issues if i.severity == "error"])
-        warning_count = len([i for i in all_issues if i.severity == "warning"])
+        error_count = len([i for i in validated_issues if i.severity == "error"])
+        warning_count = len([i for i in validated_issues if i.severity == "warning"])
         
         if error_count > 0:
             summary = f"{issue_count} issues found across {file_count} files ({error_count} errors, {warning_count} warnings)"
         else:
             summary = f"{issue_count} issues found across {file_count} files"
         
+        # Add false positive filter status to summary
+        filtered_count = len(all_issues) - len(validated_issues)
+        if filtered_count > 0:
+            summary += f" - {filtered_count} potential false positives filtered"
+        
         return AuditResponse(
             summary=summary,
-            issues=all_issues,
-            fixes=all_fixes
+            issues=validated_issues,
+            fixes=validated_fixes
         )
     
     def _run_flake8(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
