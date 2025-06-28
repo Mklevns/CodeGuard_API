@@ -30,7 +30,7 @@ class FalsePositiveFilter:
     
     def filter_issues(self, issues: List[Issue], fixes: List[Fix], code_files: List[CodeFile]) -> Tuple[List[Issue], List[Fix]]:
         """
-        Filter out false positive issues using ChatGPT analysis.
+        Filter out false positive issues using fast rule-based analysis.
         
         Args:
             issues: List of detected issues
@@ -40,55 +40,48 @@ class FalsePositiveFilter:
         Returns:
             Tuple of (filtered_issues, filtered_fixes)
         """
-        if not self._openai_client or not issues:
-            return issues, fixes
-        
-        # Quick return for small number of issues to avoid timeout
-        if len(issues) <= 3:
+        if not issues:
             return issues, fixes
         
         try:
-            # Only validate high-severity issues to reduce processing time
-            high_priority_issues = [issue for issue in issues if issue.severity in ['error', 'warning']]
-            low_priority_issues = [issue for issue in issues if issue.severity not in ['error', 'warning']]
+            # Fast rule-based filtering for common false positives
+            filtered_issues = []
             
-            if not high_priority_issues:
-                return issues, fixes
-            
-            # Group high-priority issues by file for efficient analysis
-            issues_by_file = self._group_issues_by_file(high_priority_issues, code_files)
-            
-            validated_high_priority = []
-            validated_fixes = []
-            
-            # Process only the first file to avoid timeout
-            if issues_by_file:
-                file_info = issues_by_file[0]  # Process most important file first
-                file_validated_issues, file_validated_fixes = self._validate_file_issues(
-                    file_info, fixes
-                )
-                validated_high_priority.extend(file_validated_issues)
-                validated_fixes.extend(file_validated_fixes)
+            for issue in issues:
+                # Keep all high-severity issues
+                if issue.severity in ['error']:
+                    filtered_issues.append(issue)
+                    continue
                 
-                # Add remaining files without validation if there are multiple
-                if len(issues_by_file) > 1:
-                    for file_info in issues_by_file[1:]:
-                        validated_high_priority.extend(file_info['issues'])
+                # Apply simple heuristics for common false positives
+                description_lower = issue.description.lower()
+                
+                # Keep security-related issues
+                if any(keyword in description_lower for keyword in ['pickle', 'eval', 'exec', 'unsafe']):
+                    filtered_issues.append(issue)
+                    continue
+                
+                # Filter common false positive patterns
+                if 'imported but unused' in description_lower:
+                    # Simple check for dynamic usage patterns
+                    if self._check_for_dynamic_usage(issue, code_files):
+                        continue  # Skip this issue (likely false positive)
+                
+                # Keep all other issues for now
+                filtered_issues.append(issue)
             
-            # Combine validated high-priority with all low-priority issues
-            all_validated_issues = validated_high_priority + low_priority_issues
+            # Filter corresponding fixes
+            filtered_lines = {issue.line for issue in filtered_issues}
+            filtered_fixes = [fix for fix in fixes if hasattr(fix, 'line') and fix.line in filtered_lines]
             
-            # Add all fixes for low-priority issues
-            low_priority_lines = {issue.line for issue in low_priority_issues}
-            for fix in fixes:
-                if hasattr(fix, 'line') and fix.line in low_priority_lines:
-                    validated_fixes.append(fix)
+            filtered_count = len(issues) - len(filtered_issues)
+            if filtered_count > 0:
+                print(f"Filtered {filtered_count} potential false positives using fast rules")
             
-            return all_validated_issues, validated_fixes
+            return filtered_issues, filtered_fixes
             
         except Exception as e:
             print(f"Warning: False positive filtering failed: {e}")
-            # Return original issues if filtering fails
             return issues, fixes
     
     def _group_issues_by_file(self, issues: List[Issue], code_files: List[CodeFile]) -> List[Dict[str, Any]]:
@@ -267,6 +260,85 @@ Validate all {len(issues)} issues.
         except Exception as e:
             print(f"Warning: Failed to apply validation results: {e}")
             return issues, all_fixes
+    
+    def _quick_validate_issues(self, issues: List[Issue], code_files: List[CodeFile]) -> List[Issue]:
+        """Quick validation for critical issues only."""
+        if not self._openai_client or len(issues) > 5:
+            return issues
+        
+        try:
+            # Simple validation prompt for critical issues
+            issue_descriptions = []
+            for i, issue in enumerate(issues):
+                issue_descriptions.append(f"{i}: Line {issue.line} - {issue.description}")
+            
+            prompt = f"""Quickly validate these {len(issues)} critical code issues. Only mark as false positive if very confident:
+
+{chr(10).join(issue_descriptions)}
+
+Respond with JSON: {{"valid_indices": [list of valid issue indices]}}"""
+
+            response = self._openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "Quick code issue validation. Be conservative."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=200
+            )
+            
+            if response.choices[0].message.content:
+                result = json.loads(response.choices[0].message.content)
+                valid_indices = set(result.get('valid_indices', list(range(len(issues)))))
+                return [issues[i] for i in range(len(issues)) if i in valid_indices]
+            
+        except Exception as e:
+            print(f"Quick validation failed: {e}")
+        
+        return issues
+    
+    def _has_dynamic_usage_patterns(self, issue: Issue, code_files: List[CodeFile]) -> bool:
+        """Check if an 'unused' import might actually be used dynamically."""
+        try:
+            # Extract the import name from the issue description
+            import_name = None
+            if "'" in issue.description:
+                import_name = issue.description.split("'")[1]
+            
+            if not import_name:
+                return False
+            
+            # Find the relevant code file
+            filename = getattr(issue, 'filename', '')
+            code_content = None
+            
+            for file in code_files:
+                if file.filename == filename:
+                    code_content = file.content
+                    break
+            
+            if not code_content:
+                return False
+            
+            # Simple heuristics for dynamic usage
+            dynamic_patterns = [
+                f'eval(',
+                f'exec(',
+                f'getattr(',
+                f'hasattr(',
+                f'"{import_name}"',
+                f"'{import_name}'",
+                f'globals()[',
+                f'locals()[',
+                f'__import__('
+            ]
+            
+            return any(pattern in code_content for pattern in dynamic_patterns)
+            
+        except Exception:
+            return False  # Conservative: don't filter if we can't determine
 
 # Global instance for singleton pattern
 _false_positive_filter_instance = None
