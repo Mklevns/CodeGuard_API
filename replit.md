@@ -32,24 +32,26 @@ CodeGuard is a FastAPI-based backend service that provides static code analysis 
   - `AuditOptions`: Optional configuration for analysis level, framework, and target platform
   - `AuditRequest`: Complete audit request with files and options
 - **Response Models**:
-  - `Issue`: Represents code issues with file, line, type, and description
-  - `Fix`: Represents suggested fixes for issues
-  - `AuditResponse`: Complete audit response with summary and results
+  - `Issue`: Enhanced with source tool identification and severity levels
+  - `Fix`: Extended with diff generation, replacement code, and auto-fix capabilities
+  - `AuditResponse`: Complete audit response with multi-tool analysis results
 
-### 3. Analysis Engine (`audit.py`)
-- **Core Function**: `analyze_code()` processes audit requests
-- **File Handling**: Secure temporary directory creation for analysis
-- **Analysis Pipeline**: Integration with flake8 for static code analysis
-- **Error Handling**: Graceful handling of file processing errors
+### 3. Enhanced Analysis Engine (`enhanced_audit.py`, `rule_engine.py`)
+- **Multi-Tool Integration**: Combines flake8, pylint, mypy, black, isort, and custom ML/RL rules
+- **Enhanced Analysis Pipeline**: Parallel execution of multiple static analysis tools
+- **ML/RL Pattern Detection**: Custom rules for missing seeding, environment resets, training loop issues
+- **Advanced Fix Generation**: Unified diff format and auto-fixable suggestions
+- **Error Handling**: Graceful degradation when individual tools fail
 
-## Data Flow
+## Enhanced Data Flow
 
 1. **Request Reception**: Client sends POST request to `/audit` with code files
 2. **Input Validation**: Pydantic models validate request structure and content
 3. **File Processing**: Files are written to temporary directory with sanitized names
-4. **Static Analysis**: flake8 analyzes each file for issues
-5. **Result Processing**: Issues are structured into response format
-6. **Response Delivery**: JSON response with audit results and fix suggestions
+4. **Multi-Tool Analysis**: Parallel execution of flake8, pylint, mypy, black, isort, and ML/RL rules
+5. **Result Aggregation**: Issues from all tools are collected with source attribution
+6. **Fix Generation**: Advanced suggestions with diffs, replacement code, and auto-fix flags
+7. **Response Delivery**: Comprehensive JSON response with enhanced analysis results
 
 ## External Dependencies
 
@@ -57,11 +59,20 @@ CodeGuard is a FastAPI-based backend service that provides static code analysis 
 - **FastAPI**: Web framework for API development
 - **Uvicorn**: ASGI server for production deployment
 - **Pydantic**: Data validation and serialization
-- **flake8**: Static code analysis tool
+- **flake8**: Syntax and style analysis
+- **pylint**: Comprehensive code quality analysis
+- **mypy**: Static type checking
+- **black**: Code formatting
+- **isort**: Import organization
+- **libcst**: Concrete syntax tree manipulation for advanced analysis
 
 ### Analysis Tools
-- **flake8**: Primary static analysis engine for Python code
-- **Future Extensions**: Designed to accommodate mypy, pylint, and libcst integration
+- **flake8**: Syntax and style analysis (primary engine)
+- **pylint**: Semantic analysis, logical issues, and code quality checks
+- **mypy**: Static type checking for type safety
+- **black**: Code formatting and style consistency
+- **isort**: Import statement organization and sorting
+- **ML/RL Rules Engine**: Custom pattern detection for machine learning and reinforcement learning code
 
 ## Deployment Strategy
 
@@ -113,6 +124,17 @@ Preferred communication style: Simple, everyday language.
 - Resolved "Missing API key" errors that were blocking ChatGPT from accessing the /audit endpoint
 - Authentication system modified to allow external integrations while maintaining service functionality
 - Confirmed working with successful audit response from deployed service at https://codeguard.replit.app
+- **Phase 1 Immediate Enhancements Completed**: Major upgrade to multi-tool static analysis system
+- Added pylint, mypy, black, isort, and libcst for comprehensive code analysis
+- Implemented ML/RL-specific pattern detection engine with custom rules for:
+  - Missing random seeding (torch.manual_seed, np.random.seed, random.seed)
+  - Improper RL environment resets and training loop issues
+  - Hardcoded paths, print vs logging recommendations
+  - GPU memory management suggestions and data leakage detection
+- Enhanced response format with source attribution, severity levels, and advanced fix suggestions
+- Added unified diff generation and auto-fixable flag for formatting improvements
+- Updated OpenAPI specification to reflect new enhanced response schema
+- All analysis tools running in parallel for comprehensive code quality assessment
 
 ## Deployment Status
 

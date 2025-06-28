@@ -269,6 +269,7 @@ components:
         - filename
         - line
         - suggestion
+        - auto_fixable
       properties:
         filename:
           type: string
@@ -282,7 +283,21 @@ components:
         suggestion:
           type: string
           description: Suggested fix
-          example: "Remove unused import"
+          example: "Remove unused import 'torch'"
+        diff:
+          type: string
+          nullable: true
+          description: Unified diff showing the change
+          example: "- import torch\n+"
+        replacement_code:
+          type: string
+          nullable: true
+          description: Complete replacement code for the line/block
+          example: "torch.manual_seed(42)"
+        auto_fixable:
+          type: boolean
+          description: Whether this fix can be applied automatically
+          example: true
     
     AuditResponse:
       type: object
