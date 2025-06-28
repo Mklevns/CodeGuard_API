@@ -113,7 +113,7 @@ Preferred communication style: Simple, everyday language.
 ## Deployment Status
 
 **Current Status**: ✓ Live and operational
-**Production HTTPS URL**: https://CodeGuard.replit.app
+**Production HTTPS URL**: https://codeguard.replit.app
 **Key Endpoints**:
 - `/audit` - Main code analysis endpoint (POST) - Requires API key
 - `/auth/status` - Authentication verification endpoint 
