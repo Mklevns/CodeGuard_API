@@ -1,19 +1,18 @@
 // Global type declarations for VS Code extension
+// DOM types are now available through tsconfig.json lib: ["DOM"]
 
-// Simplified types to avoid conflicts with built-in TypeScript definitions
 declare namespace CodeGuard {
-    interface RequestInit {
-        body?: string | null;
-        headers?: Record<string, string>;
-        method?: string;
-        signal?: any;
+    // Extension-specific interfaces
+    interface AuditOptions {
+        level?: string;
+        framework?: string;
+        target?: string;
     }
     
-    interface Response {
-        ok: boolean;
-        status: number;
-        statusText: string;
-        text(): Promise<string>;
-        json(): Promise<any>;
+    interface ProjectTemplate {
+        name: string;
+        description: string;
+        framework: string;
+        dependencies: number;
     }
 }
