@@ -92,6 +92,19 @@ export class DiagnosticsManager {
     getFixesForFile(uri: vscode.Uri): Fix[] {
         return this.fixes.get(uri.toString()) || [];
     }
+    
+    getDiagnosticsForFile(uri: vscode.Uri): vscode.Diagnostic[] {
+        return [...(this.diagnosticCollection.get(uri) || [])];
+    }
+    
+    clearSpecificDiagnostic(uri: vscode.Uri, diagnostic: vscode.Diagnostic) {
+        const currentDiagnostics = this.diagnosticCollection.get(uri) || [];
+        const filteredDiagnostics = currentDiagnostics.filter(d => 
+            d.range.start.line !== diagnostic.range.start.line ||
+            d.message !== diagnostic.message
+        );
+        this.diagnosticCollection.set(uri, filteredDiagnostics);
+    }
 }
 
 class CodeGuardCodeActionProvider implements vscode.CodeActionProvider {

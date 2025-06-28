@@ -36,6 +36,16 @@
         "command": "codeguard.setupProject",
         "title": "CodeGuard: Setup ML Project",
         "icon": "$(rocket)"
+      },
+      {
+        "command": "codeguard.improveWithChatGPT",
+        "title": "CodeGuard: Improve with AI",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "codeguard.showFixMenu",
+        "title": "CodeGuard: Apply Individual Fixes",
+        "icon": "$(list-selection)"
       }
     ],
     "menus": {
@@ -43,6 +53,16 @@
         {
           "when": "resourceExtname == .py",
           "command": "codeguard.runAudit",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceExtname == .py",
+          "command": "codeguard.improveWithChatGPT",
+          "group": "navigation"
+        },
+        {
+          "when": "resourceExtname == .py",
+          "command": "codeguard.showFixMenu",
           "group": "navigation"
         }
       ]
