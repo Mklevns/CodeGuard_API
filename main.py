@@ -6,6 +6,7 @@ import os
 from models import AuditRequest, AuditResponse
 from audit import analyze_code
 from auth import verify_api_key, get_current_user
+from rule_loader import CustomRuleEngine
 
 # Create FastAPI app
 app = FastAPI(
@@ -93,6 +94,46 @@ async def auth_status(current_user: dict = Depends(get_current_user)):
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "CodeGuard API"}
+
+@app.get("/rules/summary")
+async def get_rules_summary():
+    """Get a summary of all loaded custom rules."""
+    try:
+        engine = CustomRuleEngine()
+        return {
+            "status": "success",
+            "summary": engine.get_rule_summary()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get rules summary: {str(e)}")
+
+@app.post("/rules/reload")
+async def reload_rules():
+    """Reload all custom rules from rule files."""
+    try:
+        engine = CustomRuleEngine()
+        engine.reload_rules()
+        return {
+            "status": "success",
+            "message": f"Reloaded {engine.get_rule_count()} rules successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reload rules: {str(e)}")
+
+@app.get("/rules/by-tag/{tag}")
+async def get_rules_by_tag(tag: str):
+    """Get all rules that contain a specific tag."""
+    try:
+        engine = CustomRuleEngine()
+        rules = engine.get_rules_by_tag(tag)
+        return {
+            "status": "success",
+            "tag": tag,
+            "count": len(rules),
+            "rules": rules
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get rules by tag: {str(e)}")
 
 @app.get("/privacy-policy")
 async def privacy_policy():
