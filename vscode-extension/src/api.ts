@@ -92,7 +92,10 @@ export class CodeGuardAPI {
             }
         };
         
-        const response = await this.client.post('/audit', requestData);
+        // Use appropriate endpoint based on false positive filtering setting
+        const endpoint = this.configManager.getFalsePositiveFiltering() ? '/audit' : '/audit/no-filter';
+        
+        const response = await this.client.post(endpoint, requestData);
         return response.data;
     }
     

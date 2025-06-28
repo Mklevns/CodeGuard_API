@@ -114,6 +114,11 @@
           "default": [],
           "description": "List of rule IDs to ignore during analysis."
         },
+        "codeguard.enableFalsePositiveFiltering": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use ChatGPT to filter out potential false positive issues before reporting."
+        },
         "codeguard.analysisLevel": {
           "type": "string",
           "enum": ["basic", "standard", "strict"],

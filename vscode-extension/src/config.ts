@@ -47,6 +47,16 @@ export class ConfigManager {
         return config.get<boolean>('auditOnSave') ?? true;
     }
     
+    getFalsePositiveFiltering(): boolean {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get<boolean>('enableFalsePositiveFiltering') ?? true;
+    }
+    
+    async setFalsePositiveFiltering(enabled: boolean): Promise<void> {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        await config.update('enableFalsePositiveFiltering', enabled, vscode.ConfigurationTarget.Global);
+    }
+    
     getIgnoreRules(): string[] {
         const config = vscode.workspace.getConfiguration('codeguard');
         return config.get<string[]>('ignoreRules') || [];
