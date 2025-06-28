@@ -8,6 +8,7 @@ from audit import analyze_code
 from auth import verify_api_key, get_current_user
 from rule_loader import CustomRuleEngine
 from telemetry import telemetry_collector, metrics_analyzer
+from dashboard import get_dashboard
 import uuid
 import time
 
@@ -167,6 +168,65 @@ async def get_rules_by_tag(tag: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get rules by tag: {str(e)}")
+
+@app.get("/metrics/usage")
+async def get_usage_metrics(days: int = 7):
+    """Get usage metrics for the specified number of days."""
+    try:
+        metrics = telemetry_collector.get_usage_metrics(days)
+        return {
+            "status": "success",
+            "metrics": metrics
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get usage metrics: {str(e)}")
+
+@app.get("/metrics/frameworks")
+async def get_framework_metrics():
+    """Get framework usage statistics."""
+    try:
+        # Use in-memory data if database is unavailable
+        if hasattr(telemetry_collector, 'memory_frameworks'):
+            framework_stats = dict(telemetry_collector.memory_frameworks)
+        else:
+            framework_stats = {}
+        
+        return {
+            "status": "success",
+            "frameworks": framework_stats,
+            "total_detections": sum(framework_stats.values())
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get framework metrics: {str(e)}")
+
+@app.get("/dashboard")
+async def get_analytics_dashboard(days: int = 7):
+    """Get comprehensive analytics dashboard data."""
+    try:
+        dashboard_instance = get_dashboard()
+        data = dashboard_instance.generate_dashboard_data(days)
+        return {
+            "status": "success",
+            "dashboard": data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate dashboard: {str(e)}")
+
+@app.get("/dashboard/export")
+async def export_analytics_report(days: int = 7, format: str = "markdown"):
+    """Export analytics report in various formats."""
+    try:
+        dashboard_instance = get_dashboard()
+        data = dashboard_instance.generate_dashboard_data(days)
+        report = dashboard_instance.export_report(data, format)
+        
+        if format.lower() == "markdown":
+            return {"status": "success", "report": report, "format": "markdown"}
+        else:
+            return {"status": "success", "report": report, "format": format}
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export report: {str(e)}")
 
 @app.get("/privacy-policy")
 async def privacy_policy():

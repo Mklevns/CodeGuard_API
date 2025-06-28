@@ -12,6 +12,7 @@ from typing import List, Dict, Tuple, Optional
 from models import AuditRequest, AuditResponse, Issue, Fix
 from rule_engine import MLRLRuleEngine
 from rule_loader import CustomRuleEngine
+from rl_environment_plugin import rl_env_analyzer, rl_config_analyzer
 
 
 class EnhancedAuditEngine:
@@ -27,7 +28,8 @@ class EnhancedAuditEngine:
             'black': self._run_black,
             'isort': self._run_isort,
             'ml_rules': self._run_ml_rules,
-            'custom_rules': self._run_custom_rules
+            'custom_rules': self._run_custom_rules,
+            'rl_plugin': self._run_rl_plugin
         }
     
     def analyze_code(self, request: AuditRequest) -> AuditResponse:
@@ -527,6 +529,13 @@ class EnhancedAuditEngine:
     def _run_custom_rules(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
         """Run custom rules loaded from external rule files."""
         return self.custom_rule_engine.analyze_file(original_filename, content)
+    
+    def _run_rl_plugin(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
+        """Run RL environment plugin analysis."""
+        if original_filename.endswith('.yaml') or original_filename.endswith('.yml'):
+            return rl_config_analyzer.analyze_config(original_filename, content)
+        else:
+            return rl_env_analyzer.analyze_environment_code(original_filename, content)
     
     def _categorize_flake8_issue(self, code: str) -> str:
         """Categorizes flake8 error codes into issue types."""

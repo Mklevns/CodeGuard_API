@@ -136,21 +136,34 @@ Preferred communication style: Simple, everyday language.
 - Updated OpenAPI specification to reflect new enhanced response schema
 - All analysis tools running in parallel for comprehensive code quality assessment
 - **Custom Rule Loader System Implemented**: Fully extensible rule architecture for user-defined analysis patterns
-- Created JSON-based rule definition system with 15 predefined ML/RL rules covering security, best practices, and domain-specific patterns
+- Created JSON-based rule definition system with 28 predefined rules covering security, performance, and ML/RL patterns
 - Implemented CustomRuleEngine with pattern matching, regex support, and automatic fix generation
 - Added rule management API endpoints: `/rules/summary`, `/rules/reload`, `/rules/by-tag/{tag}`
 - Rules support multiple matching strategies: contains, regex, pattern with exclusions
-- Comprehensive rule categories: reproducibility, security, portability, validation, memory management
-- System now processes 6 analysis tools simultaneously: flake8, pylint, mypy, black, isort, custom_rules
-- Successfully tested with 41 total issues detected and 9 auto-fixable suggestions generated
+- Comprehensive rule categories: reproducibility, security, portability, validation, memory management, performance
+- **Telemetry and Usage Metrics System**: PostgreSQL-based analytics with in-memory fallback
+- Tracks audit sessions, framework usage, error patterns, and performance metrics
+- Added metrics endpoints: `/metrics/usage`, `/metrics/frameworks`, `/dashboard`
+- Framework detection for PyTorch, TensorFlow, JAX, Gym, Stable-Baselines3, and more
+- **RL Environment Plugin Support**: Specialized analysis for reinforcement learning code
+- Detects missing env.reset(), reward saturation, action space mismatches, observation handling
+- Analyzes YAML configuration files for hyperparameter validation
+- **Analytics Dashboard**: Comprehensive usage analytics with insights and alerts
+- Export capabilities for Markdown and JSON reports
+- System now processes 8 analysis tools: flake8, pylint, mypy, black, isort, ml_rules, custom_rules, rl_plugin
+- Successfully tested with 51 total issues detected across 8 tools and 10 auto-fixable suggestions
 
 ## Deployment Status
 
 **Current Status**: ✓ Live and operational
 **Production HTTPS URL**: https://codeguard.replit.app
 **Key Endpoints**:
-- `/audit` - Main code analysis endpoint (POST) - Requires API key
-- `/auth/status` - Authentication verification endpoint 
+- `/audit` - Main code analysis endpoint (POST) with comprehensive telemetry
+- `/rules/summary` - Custom rule management and statistics
+- `/rules/by-tag/{tag}` - Filter rules by category (ml, security, performance)
+- `/metrics/usage` - Usage analytics and performance metrics
+- `/dashboard` - Comprehensive analytics dashboard with insights
+- `/dashboard/export` - Export reports in Markdown/JSON formats
 - `/docs` - Interactive API documentation 
 - `/health` - Service health check
 - `/.well-known/openapi.yaml` - OpenAPI spec for GPT Actions
