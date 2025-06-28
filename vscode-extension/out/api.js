@@ -104,6 +104,36 @@ class CodeGuardAPI {
         });
         return response.data.project;
     }
+    async improveCode(originalCode, filename, issues, fixes) {
+        const response = await this.client.post('/improve/code', {
+            original_code: originalCode,
+            filename,
+            issues,
+            fixes,
+            improvement_level: 'moderate',
+            preserve_functionality: true
+        });
+        return response.data;
+    }
+    async improveProject(files, auditResults) {
+        const response = await this.client.post('/improve/project', {
+            files,
+            audit_results: auditResults
+        });
+        return response.data;
+    }
+    async auditAndImprove(files, options) {
+        const requestData = {
+            files,
+            options: {
+                level: options?.level || this.configManager.getAnalysisLevel(),
+                framework: options?.framework || 'auto',
+                target: options?.target || 'gpu'
+            }
+        };
+        const response = await this.client.post('/audit-and-improve', requestData);
+        return response.data;
+    }
 }
 exports.CodeGuardAPI = CodeGuardAPI;
 //# sourceMappingURL=api.js.map

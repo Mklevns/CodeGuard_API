@@ -64,6 +64,15 @@ class DiagnosticsManager {
     getFixesForFile(uri) {
         return this.fixes.get(uri.toString()) || [];
     }
+    getDiagnosticsForFile(uri) {
+        return [...(this.diagnosticCollection.get(uri) || [])];
+    }
+    clearSpecificDiagnostic(uri, diagnostic) {
+        const currentDiagnostics = this.diagnosticCollection.get(uri) || [];
+        const filteredDiagnostics = currentDiagnostics.filter(d => d.range.start.line !== diagnostic.range.start.line ||
+            d.message !== diagnostic.message);
+        this.diagnosticCollection.set(uri, filteredDiagnostics);
+    }
 }
 exports.DiagnosticsManager = DiagnosticsManager;
 class CodeGuardCodeActionProvider {
