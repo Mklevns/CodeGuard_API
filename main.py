@@ -655,12 +655,15 @@ async def generate_improvement_report(request: dict):
         
         # Apply false positive filtering if requested (uses fast rule-based filtering, no ChatGPT calls)
         if apply_filtering:
+            print(f"DEBUG: Applying false positive filtering to {len(audit_response.issues)} issues")
             false_positive_filter = get_false_positive_filter()
             filtered_issues, filtered_fixes = false_positive_filter.filter_issues(
                 audit_response.issues, 
                 audit_response.fixes, 
                 audit_request.files
             )
+            
+            print(f"DEBUG: After filtering: {len(filtered_issues)} issues remaining")
             
             # Update audit response with filtered results
             audit_response.issues = filtered_issues

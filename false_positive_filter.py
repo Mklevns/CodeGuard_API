@@ -63,12 +63,20 @@ class FalsePositiveFilter:
                 
                 # Skip common false positive patterns
                 skip_patterns = [
-                    'line too long',  # Formatting issues are low priority
-                    'missing whitespace',  # Style issues
-                    'too many blank lines',  # Style issues
+                    'line too long',  # E501: line too long
+                    'missing whitespace',  # E225: missing whitespace around operator
+                    'too many blank lines',  # E303: too many blank lines
+                    'expected 2 blank lines',  # E302: expected 2 blank lines
+                    'blank line at end of file',  # W292: no newline at end of file
+                    'trailing whitespace',  # W291: trailing whitespace
+                    'multiple spaces',  # E221: multiple spaces before operator
+                    'whitespace before',  # E201: whitespace after '('
+                    'whitespace after',  # E202: whitespace before ')'
+                    'blank line contains whitespace',  # W293: blank line contains whitespace
                 ]
                 
                 if any(pattern in description_lower for pattern in skip_patterns):
+                    print(f"DEBUG: Filtering out issue: {issue.description[:50]}...")
                     continue  # Skip these common style issues
                 
                 # Keep all other issues
