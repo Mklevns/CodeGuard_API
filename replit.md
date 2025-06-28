@@ -98,6 +98,11 @@ Preferred communication style: Simple, everyday language.
 - Updated Field definitions to use json_schema_extra instead of deprecated schema_extra
 - Fixed authentication to allow requests without headers in development mode
 - Authentication now works properly for automated tools and OpenAI GPT Actions
+- **Cloud Run deployment fixes applied**: Fixed run command to use main.py explicitly instead of $file variable
+- Enhanced root endpoint (/) to include "status": "healthy" for faster health check responses
+- Updated application startup to properly handle PORT environment variable and environment detection
+- Fixed uvicorn reload warning by using import string format in development mode
+- Production entry point (run.py) confirmed working for Cloud Run deployment
 
 ## Deployment Status
 

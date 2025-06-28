@@ -26,8 +26,9 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    """Root endpoint providing basic service information."""
+    """Root endpoint providing basic service information and health check."""
     return {
+        "status": "healthy",
         "service": "CodeGuard API",
         "version": "1.0.0",
         "description": "Static code analysis service for ML/RL Python code",
@@ -102,12 +103,29 @@ async def terms_of_service():
         raise HTTPException(status_code=404, detail="Terms of service not found")
 
 if __name__ == "__main__":
-    # Run the application
-    port = int(os.getenv("PORT", 5000))
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        reload=True,
-        log_level="info"
-    )
+    # Run the application - optimized for both development and Cloud Run
+    port = int(os.environ.get("PORT", 5000))
+    environment = os.environ.get("ENVIRONMENT", "development")
+    
+    print(f"Starting CodeGuard API on 0.0.0.0:{port} (environment: {environment})")
+    
+    if environment == "development":
+        # Use import string for reload functionality in development
+        uvicorn.run(
+            "main:app",
+            host="0.0.0.0",
+            port=port,
+            reload=True,
+            log_level="info",
+            access_log=True
+        )
+    else:
+        # Use app object directly in production for better performance
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=port,
+            reload=False,
+            log_level="info",
+            access_log=True
+        )
