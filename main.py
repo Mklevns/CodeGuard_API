@@ -7,6 +7,9 @@ from models import AuditRequest, AuditResponse
 from audit import analyze_code
 from auth import verify_api_key, get_current_user
 from rule_loader import CustomRuleEngine
+from telemetry import telemetry_collector, metrics_analyzer
+import uuid
+import time
 
 # Create FastAPI app
 app = FastAPI(
@@ -58,9 +61,39 @@ async def audit_code(request: AuditRequest, current_user: dict = Depends(get_cur
     Raises:
         HTTPException: If analysis fails
     """
+    session_id = str(uuid.uuid4())
+    start_time = time.time()
+    
     try:
-        return analyze_code(request)
+        # Analyze request for telemetry
+        request_analysis = metrics_analyzer.analyze_request(request)
+        
+        # Perform code analysis
+        response = analyze_code(request)
+        
+        # Calculate analysis time
+        analysis_time = (time.time() - start_time) * 1000  # Convert to ms
+        
+        # Analyze response for telemetry
+        response_analysis = metrics_analyzer.analyze_response(response)
+        
+        # Create and record telemetry session
+        session = metrics_analyzer.create_session(
+            session_id, request_analysis, response_analysis, analysis_time
+        )
+        telemetry_collector.record_audit_session(session)
+        telemetry_collector.record_error_patterns(session_id, response.issues)
+        
+        # Record framework usage if detected
+        if request_analysis['primary_framework']:
+            telemetry_collector.record_framework_usage(request_analysis['primary_framework'])
+        
+        return response
+        
     except Exception as e:
+        # Record failed session for monitoring
+        analysis_time = (time.time() - start_time) * 1000
+        # Log error but don't expose internal details
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/.well-known/openapi.yaml")

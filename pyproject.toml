@@ -10,6 +10,7 @@ dependencies = [
     "isort>=6.0.1",
     "libcst>=1.8.2",
     "mypy>=1.16.1",
+    "psycopg2-binary>=2.9.10",
     "pydantic>=2.11.7",
     "pylint>=3.3.7",
     "uvicorn>=0.34.3",
