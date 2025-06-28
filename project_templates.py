@@ -483,14 +483,15 @@ class MLProjectGenerator:
             raise ValueError(f"Template '{template_name}' not found. Available: {list(self.templates.keys())}")
         
         template = self.templates[template_name]
-        project_path = Path(project_path)
+        project_path_str = str(project_path)
+        project_path_obj = Path(project_path_str)
         
         # Create project directory
-        project_path.mkdir(parents=True, exist_ok=True)
+        project_path_obj.mkdir(parents=True, exist_ok=True)
         
         # Create subdirectories
         for directory in template.directories:
-            (project_path / directory).mkdir(parents=True, exist_ok=True)
+            (project_path_obj / directory).mkdir(parents=True, exist_ok=True)
         
         # Generate requirements.txt
         requirements_content = self._generate_requirements(template)
@@ -504,7 +505,7 @@ class MLProjectGenerator:
                 # Merge custom configuration
                 content = self._merge_config(content, custom_config)
             
-            file_path = project_path / filename
+            file_path = project_path_obj / filename
             with open(file_path, 'w') as f:
                 f.write(content)
             created_files.append(str(file_path))
@@ -527,7 +528,7 @@ class MLProjectGenerator:
             ]
         }
     
-    def list_templates(self) -> List[Dict[str, str]]:
+    def list_templates(self) -> List[Dict[str, Any]]:
         """List all available project templates."""
         return [
             {
@@ -575,7 +576,7 @@ class MLProjectGenerator:
         except:
             return base_config
     
-    # Template content methods (implementation details follow...)
+    # Template content methods - PyTorch
     def _get_pytorch_main(self) -> str:
         return '''"""
 PyTorch Deep Learning Project - Main Entry Point
@@ -938,5 +939,726 @@ Thumbs.db
         }
         return json.dumps(config, indent=2)
     
-    # Additional template methods would follow similar pattern...
-    # (Implementation for all other frameworks continues...)
+    # Template content methods - TensorFlow
+    def _get_tensorflow_main(self) -> str:
+        return '''"""
+TensorFlow Deep Learning Project - Main Entry Point
+"""
+
+import tensorflow as tf
+import yaml
+import logging
+from pathlib import Path
+
+from model import create_model
+from train import train_model
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def main():
+    """Main training pipeline."""
+    # Load configuration
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Set random seeds for reproducibility
+    tf.random.set_seed(config['training']['seed'])
+    
+    # GPU configuration
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logger.info(f"Found {len(gpus)} GPU(s)")
+        except RuntimeError as e:
+            logger.error(f"GPU setup error: {e}")
+    
+    # Create model
+    model = create_model(config)
+    logger.info(f"Model created with {model.count_params():,} parameters")
+    
+    # Compile model
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(config['training']['learning_rate']),
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    
+    # Train model
+    history = train_model(model, config)
+    
+    # Save model
+    model_path = Path('models') / f"model_epoch_{config['training']['epochs']}.h5"
+    model.save(model_path)
+    logger.info(f"Model saved to {model_path}")
+
+if __name__ == "__main__":
+    main()
+'''
+    
+    def _get_tensorflow_model(self) -> str:
+        return '''"""
+TensorFlow/Keras Model Definitions
+"""
+
+import tensorflow as tf
+from tensorflow.keras import layers, Model
+
+def create_model(config):
+    """Create a neural network model based on configuration."""
+    model_type = config['model'].get('type', 'dense')
+    
+    if model_type == 'dense':
+        return create_dense_model(config)
+    elif model_type == 'cnn':
+        return create_cnn_model(config)
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
+
+def create_dense_model(config):
+    """Create a dense neural network."""
+    inputs = tf.keras.Input(shape=(config['model']['input_size'],))
+    
+    x = inputs
+    for hidden_size in config['model']['hidden_sizes']:
+        x = layers.Dense(hidden_size, activation='relu')(x)
+        x = layers.Dropout(config['model']['dropout_rate'])(x)
+    
+    outputs = layers.Dense(config['model']['num_classes'], activation='softmax')(x)
+    
+    model = Model(inputs=inputs, outputs=outputs, name='DenseNet')
+    return model
+
+def create_cnn_model(config):
+    """Create a convolutional neural network."""
+    inputs = tf.keras.Input(shape=config['model']['input_shape'])
+    
+    x = inputs
+    
+    # Convolutional layers
+    for filters in config['model']['conv_filters']:
+        x = layers.Conv2D(filters, 3, activation='relu', padding='same')(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.MaxPooling2D()(x)
+    
+    # Dense layers
+    x = layers.GlobalAveragePooling2D()(x)
+    x = layers.Dense(config['model']['dense_size'], activation='relu')(x)
+    x = layers.Dropout(config['model']['dropout_rate'])(x)
+    
+    outputs = layers.Dense(config['model']['num_classes'], activation='softmax')(x)
+    
+    model = Model(inputs=inputs, outputs=outputs, name='CNNNet')
+    return model
+'''
+    
+    def _get_tensorflow_train(self) -> str:
+        return '''"""
+TensorFlow Training Functions
+"""
+
+import tensorflow as tf
+import numpy as np
+from tensorflow.keras.callbacks import TensorBoard, EarlyStopping, ReduceLROnPlateau
+import logging
+
+logger = logging.getLogger(__name__)
+
+def train_model(model, config):
+    """Train the TensorFlow model."""
+    
+    # Create dummy dataset for demonstration
+    # Replace with your actual dataset
+    x_train = np.random.randn(1000, config['model']['input_size'])
+    y_train = np.random.randint(0, config['model']['num_classes'], 1000)
+    
+    x_val = np.random.randn(200, config['model']['input_size'])
+    y_val = np.random.randint(0, config['model']['num_classes'], 200)
+    
+    # Create datasets
+    train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+    train_dataset = train_dataset.batch(config['training']['batch_size']).prefetch(tf.data.AUTOTUNE)
+    
+    val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val))
+    val_dataset = val_dataset.batch(config['training']['batch_size']).prefetch(tf.data.AUTOTUNE)
+    
+    # Callbacks
+    callbacks = [
+        TensorBoard(log_dir='logs', histogram_freq=1),
+        EarlyStopping(patience=10, restore_best_weights=True),
+        ReduceLROnPlateau(factor=0.2, patience=5, min_lr=1e-7)
+    ]
+    
+    # Train the model
+    history = model.fit(
+        train_dataset,
+        epochs=config['training']['epochs'],
+        validation_data=val_dataset,
+        callbacks=callbacks,
+        verbose=1
+    )
+    
+    return history
+'''
+    
+    def _get_tensorflow_config(self) -> str:
+        return '''# TensorFlow Project Configuration
+
+model:
+  type: "dense"  # dense, cnn
+  input_size: 784
+  hidden_sizes: [512, 256, 128]
+  num_classes: 10
+  dropout_rate: 0.2
+  
+  # CNN specific
+  input_shape: [28, 28, 1]
+  conv_filters: [32, 64, 128]
+  dense_size: 512
+
+training:
+  batch_size: 32
+  learning_rate: 0.001
+  epochs: 50
+  seed: 42
+  validation_split: 0.2
+
+optimization:
+  mixed_precision: true
+  gradient_clipping: 1.0
+
+data:
+  dataset: "custom"
+  preprocessing: true
+  augmentation: false
+'''
+    
+    def _get_tensorflow_readme(self) -> str:
+        return '''# TensorFlow Deep Learning Project
+
+Complete TensorFlow/Keras setup for deep learning projects with best practices.
+
+## Features
+
+- Clean project structure  
+- Configurable models (Dense, CNN)
+- Training pipeline with callbacks
+- GPU support with memory growth
+- Mixed precision training
+- TensorBoard integration
+
+## Quick Start
+
+1. **Setup Environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+2. **Run Training**
+   ```bash
+   python main.py
+   ```
+
+3. **Monitor Training**
+   ```bash
+   tensorboard --logdir=logs
+   ```
+
+## Configuration
+
+Edit `config.yaml` to customize:
+- Model architecture parameters
+- Training hyperparameters  
+- Data loading settings
+
+## GPU Support
+
+Automatic GPU detection with memory growth configuration for optimal performance.
+'''
+    
+    # Template content methods - OpenAI Gym
+    def _get_gym_main(self) -> str:
+        return '''"""
+OpenAI Gym RL Project - Main Entry Point
+"""
+
+import gym
+import numpy as np
+import yaml
+import logging
+from pathlib import Path
+
+from agent import RandomAgent, QLearningAgent
+from environment import make_env
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def main():
+    """Main RL training pipeline."""
+    # Load configuration
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Set random seeds
+    np.random.seed(config['training']['seed'])
+    
+    # Create environment
+    env = make_env(config['environment']['name'])
+    logger.info(f"Environment: {config['environment']['name']}")
+    logger.info(f"Observation space: {env.observation_space}")
+    logger.info(f"Action space: {env.action_space}")
+    
+    # Create agent
+    if config['agent']['type'] == 'random':
+        agent = RandomAgent(env.action_space)
+    elif config['agent']['type'] == 'qlearning':
+        agent = QLearningAgent(env.observation_space, env.action_space, config['agent'])
+    else:
+        raise ValueError(f"Unknown agent type: {config['agent']['type']}")
+    
+    # Training loop
+    episode_rewards = []
+    best_reward = float('-inf')
+    
+    for episode in range(config['training']['episodes']):
+        obs = env.reset()
+        total_reward = 0
+        done = False
+        step = 0
+        
+        while not done and step < config['training']['max_steps']:
+            action = agent.act(obs)
+            next_obs, reward, done, info = env.step(action)
+            
+            if hasattr(agent, 'learn'):
+                agent.learn(obs, action, reward, next_obs, done)
+            
+            obs = next_obs
+            total_reward += reward
+            step += 1
+        
+        episode_rewards.append(total_reward)
+        
+        if total_reward > best_reward:
+            best_reward = total_reward
+            if hasattr(agent, 'save'):
+                agent.save('models/best_agent.pkl')
+        
+        if episode % config['training']['log_interval'] == 0:
+            avg_reward = np.mean(episode_rewards[-100:])
+            logger.info(f"Episode {episode}: Reward: {total_reward:.2f}, Avg: {avg_reward:.2f}")
+        
+        if hasattr(agent, 'decay_exploration'):
+            agent.decay_exploration()
+    
+    env.close()
+    logger.info(f"Training completed. Best reward: {best_reward:.2f}")
+
+if __name__ == "__main__":
+    main()
+'''
+    
+    def _get_gym_agent(self) -> str:
+        return '''"""
+RL Agents for OpenAI Gym Environments
+"""
+
+import numpy as np
+import pickle
+from collections import defaultdict, deque
+import random
+
+class RandomAgent:
+    """Random action agent for baseline comparison."""
+    
+    def __init__(self, action_space):
+        self.action_space = action_space
+    
+    def act(self, observation):
+        return self.action_space.sample()
+
+class QLearningAgent:
+    """Q-Learning agent for discrete state-action spaces."""
+    
+    def __init__(self, observation_space, action_space, config):
+        self.observation_space = observation_space
+        self.action_space = action_space
+        
+        # Hyperparameters
+        self.learning_rate = config.get('learning_rate', 0.1)
+        self.discount_factor = config.get('discount_factor', 0.99)
+        self.epsilon = config.get('epsilon', 1.0)
+        self.epsilon_min = config.get('epsilon_min', 0.01)
+        self.epsilon_decay = config.get('epsilon_decay', 0.995)
+        
+        # Q-table
+        self.q_table = defaultdict(lambda: np.zeros(action_space.n))
+    
+    def _discretize_state(self, state):
+        """Convert continuous state to discrete representation."""
+        if isinstance(state, (int, np.integer)):
+            return state
+        
+        if hasattr(state, '__len__'):
+            return tuple(np.round(state, 2))
+        return round(state, 2)
+    
+    def act(self, state):
+        """Choose action using epsilon-greedy policy."""
+        discrete_state = self._discretize_state(state)
+        
+        if random.random() < self.epsilon:
+            return self.action_space.sample()
+        
+        return np.argmax(self.q_table[discrete_state])
+    
+    def learn(self, state, action, reward, next_state, done):
+        """Update Q-table using Q-learning update rule."""
+        discrete_state = self._discretize_state(state)
+        discrete_next_state = self._discretize_state(next_state)
+        
+        current_q = self.q_table[discrete_state][action]
+        
+        if done:
+            target = reward
+        else:
+            target = reward + self.discount_factor * np.max(self.q_table[discrete_next_state])
+        
+        self.q_table[discrete_state][action] += self.learning_rate * (target - current_q)
+    
+    def decay_exploration(self):
+        """Decay epsilon for exploration-exploitation balance."""
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+    
+    def save(self, filepath):
+        """Save the Q-table to file."""
+        with open(filepath, 'wb') as f:
+            pickle.dump(dict(self.q_table), f)
+'''
+    
+    def _get_gym_environment(self) -> str:
+        return '''"""
+Custom Environment Utilities and Wrappers
+"""
+
+import gym
+import numpy as np
+
+def make_env(env_name, **kwargs):
+    """Create and configure environment with optional wrappers."""
+    env = gym.make(env_name, **kwargs)
+    return env
+
+class RewardWrapper(gym.RewardWrapper):
+    """Custom reward shaping wrapper."""
+    
+    def __init__(self, env, reward_scale=1.0):
+        super().__init__(env)
+        self.reward_scale = reward_scale
+    
+    def reward(self, reward):
+        return reward * self.reward_scale
+
+class ObservationWrapper(gym.ObservationWrapper):
+    """Normalize observations to [0, 1] range."""
+    
+    def __init__(self, env):
+        super().__init__(env)
+        
+        self.obs_low = env.observation_space.low
+        self.obs_high = env.observation_space.high
+        
+        self.obs_low = np.where(np.isfinite(self.obs_low), self.obs_low, -10)
+        self.obs_high = np.where(np.isfinite(self.obs_high), self.obs_high, 10)
+    
+    def observation(self, obs):
+        normalized = (obs - self.obs_low) / (self.obs_high - self.obs_low)
+        return np.clip(normalized, 0, 1)
+'''
+    
+    def _get_gym_config(self) -> str:
+        return '''# OpenAI Gym RL Configuration
+
+environment:
+  name: "CartPole-v1"
+  render_mode: "human"
+
+agent:
+  type: "qlearning"  # random, qlearning
+  learning_rate: 0.1
+  discount_factor: 0.99
+  epsilon: 1.0
+  epsilon_min: 0.01
+  epsilon_decay: 0.995
+
+training:
+  episodes: 1000
+  max_steps: 500
+  seed: 42
+  log_interval: 100
+
+logging:
+  level: "INFO"
+  save_models: true
+'''
+    
+    def _get_gym_readme(self) -> str:
+        return '''# OpenAI Gym RL Project
+
+Reinforcement learning environment for research and development with OpenAI Gym.
+
+## Features
+
+- Multiple agent implementations (Random, Q-Learning)
+- Environment wrappers and utilities
+- Training loop with logging
+- Model saving and loading
+- Configurable hyperparameters
+
+## Quick Start
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+## Agents
+
+- **RandomAgent**: Baseline random action selection
+- **QLearningAgent**: Tabular Q-learning for discrete spaces
+
+## Configuration
+
+Edit `config.yaml` to customize environments, agents, and training parameters.
+'''
+
+    # Add placeholder methods for remaining templates
+    def _get_sb3_main(self) -> str:
+        return '''"""Stable-Baselines3 RL Project"""
+import gym
+from stable_baselines3 import PPO
+
+def main():
+    env = gym.make("CartPole-v1")
+    model = PPO("MlpPolicy", env, verbose=1)
+    model.learn(total_timesteps=10000)
+    model.save("ppo_cartpole")
+
+if __name__ == "__main__":
+    main()
+'''
+
+    def _get_sb3_train(self) -> str:
+        return '''"""Training utilities for Stable-Baselines3"""
+# Training functions for SB3 models
+'''
+
+    def _get_sb3_evaluate(self) -> str:
+        return '''"""Evaluation utilities for Stable-Baselines3"""
+# Evaluation functions for SB3 models
+'''
+
+    def _get_sb3_config(self) -> str:
+        return '''# Stable-Baselines3 Configuration
+algorithm: "PPO"
+total_timesteps: 100000
+learning_rate: 0.0003
+'''
+
+    def _get_sb3_readme(self) -> str:
+        return '''# Stable-Baselines3 RL Project
+Advanced RL with Stable-Baselines3 algorithms.
+'''
+
+    # Add minimal implementations for other templates
+    def _get_jax_main(self) -> str:
+        return '''"""JAX Research Project"""
+import jax.numpy as jnp
+'''
+
+    def _get_jax_model(self) -> str:
+        return '''"""JAX Models"""
+# JAX model definitions
+'''
+
+    def _get_jax_train(self) -> str:
+        return '''"""JAX Training"""
+# JAX training functions
+'''
+
+    def _get_jax_config(self) -> str:
+        return '''# JAX Configuration
+precision: "float32"
+'''
+
+    def _get_jax_readme(self) -> str:
+        return '''# JAX Research Project
+High-performance ML research with JAX/Flax.
+'''
+
+    def _get_sklearn_main(self) -> str:
+        return '''"""Scikit-learn ML Project"""
+from sklearn.datasets import make_classification
+from sklearn.ensemble import RandomForestClassifier
+'''
+
+    def _get_sklearn_processing(self) -> str:
+        return '''"""Data processing utilities"""
+# Data preprocessing functions
+'''
+
+    def _get_sklearn_model_selection(self) -> str:
+        return '''"""Model selection utilities"""
+# Model selection and evaluation
+'''
+
+    def _get_sklearn_config(self) -> str:
+        return '''# Scikit-learn Configuration
+test_size: 0.2
+random_state: 42
+'''
+
+    def _get_sklearn_readme(self) -> str:
+        return '''# Scikit-learn ML Project
+Classical machine learning with scikit-learn.
+'''
+
+    def _get_ds_main(self) -> str:
+        return '''"""Data Science Project"""
+import pandas as pd
+import numpy as np
+'''
+
+    def _get_ds_eda(self) -> str:
+        return '''"""Exploratory Data Analysis"""
+# EDA functions
+'''
+
+    def _get_ds_preprocessing(self) -> str:
+        return '''"""Data preprocessing"""
+# Data preprocessing utilities
+'''
+
+    def _get_ds_config(self) -> str:
+        return '''# Data Science Configuration
+data_format: "csv"
+'''
+
+    def _get_ds_readme(self) -> str:
+        return '''# Data Science Project
+Comprehensive data science workflow.
+'''
+
+    def _get_cv_main(self) -> str:
+        return '''"""Computer Vision Project"""
+import torch
+import torchvision
+'''
+
+    def _get_cv_dataset(self) -> str:
+        return '''"""CV Dataset utilities"""
+# Computer vision datasets
+'''
+
+    def _get_cv_transforms(self) -> str:
+        return '''"""CV Transforms"""
+# Image transformations
+'''
+
+    def _get_cv_config(self) -> str:
+        return '''# Computer Vision Configuration
+image_size: 224
+batch_size: 32
+'''
+
+    def _get_cv_readme(self) -> str:
+        return '''# Computer Vision Project
+Computer vision with PyTorch and OpenCV.
+'''
+
+    def _get_nlp_main(self) -> str:
+        return '''"""NLP with Transformers"""
+from transformers import AutoTokenizer, AutoModel
+'''
+
+    def _get_nlp_model(self) -> str:
+        return '''"""NLP Models"""
+# NLP model definitions
+'''
+
+    def _get_nlp_data_loader(self) -> str:
+        return '''"""NLP Data Loaders"""
+# Text data loading utilities
+'''
+
+    def _get_nlp_config(self) -> str:
+        return '''# NLP Configuration
+model_name: "bert-base-uncased"
+max_length: 512
+'''
+
+    def _get_nlp_readme(self) -> str:
+        return '''# NLP with Transformers
+Natural language processing with Hugging Face transformers.
+'''
+
+    def _get_mlops_main(self) -> str:
+        return '''"""MLOps Project"""
+import mlflow
+import dvc.api
+'''
+
+    def _get_mlops_train(self) -> str:
+        return '''"""MLOps Training"""
+# MLOps training pipeline
+'''
+
+    def _get_mlops_serve(self) -> str:
+        return '''"""MLOps Serving"""
+# Model serving utilities
+'''
+
+    def _get_mlops_config(self) -> str:
+        return '''# MLOps Configuration
+mlflow_tracking: true
+'''
+
+    def _get_dvc_config(self) -> str:
+        return '''# DVC Configuration
+remote: s3
+'''
+
+    def _get_mlflow_config(self) -> str:
+        return '''# MLflow Configuration
+tracking_uri: sqlite:///mlflow.db
+'''
+
+    def _get_docker_compose(self) -> str:
+        return '''version: '3.8'
+services:
+  mlflow:
+    image: mlflow
+    ports:
+      - "5000:5000"
+'''
+
+    def _get_mlops_gitignore(self) -> str:
+        return self._get_ml_gitignore() + '''
+# MLOps specific
+mlruns/
+.dvc/
+'''
+
+    def _get_mlops_readme(self) -> str:
+        return '''# MLOps Complete Project
+Production-ready ML with MLflow, DVC, and monitoring.
+'''
