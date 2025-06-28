@@ -8,8 +8,10 @@ info:
   license:
     name: MIT
 servers:
-  - url: http://34.55.167.13:5000
-    description: Public API instance running on port 5000
+  - url: https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev
+    description: Production HTTPS endpoint
+  - url: http://localhost:5000
+    description: Local development server
 paths:
   /audit:
     post:

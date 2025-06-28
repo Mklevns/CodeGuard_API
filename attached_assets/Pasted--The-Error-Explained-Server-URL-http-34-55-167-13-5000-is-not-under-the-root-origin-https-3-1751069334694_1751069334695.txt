@@ -1,0 +1,87 @@
+🚨 The Error Explained
+❌ "Server URL http://34.55.167.13:5000 is not under the root origin https://34.55.167.13"
+
+OpenAI is strict about this:
+
+Your GPT Action origin is https://34.55.167.13 (note: HTTPS, no port).
+
+But your OpenAPI spec declares:
+
+yaml
+Copy
+Edit
+servers:
+  - url: http://34.55.167.13:5000
+So OpenAI ignores your server declaration and can't route requests properly.
+
+✅ How to Fix It
+🔒 Step 1: Secure Your API with HTTPS
+You must serve your API over HTTPS, without a port (or using default port 443). OpenAI GPT Actions do not support plain HTTP or non-443 ports.
+
+You need:
+A public domain or static IP with an SSL certificate
+
+Or use a platform that provides HTTPS by default:
+
+Render
+
+Fly.io
+
+Vercel
+
+Replit Teams Pro + HTTPS-enabled domain
+
+🛠 Example Fix: Change OpenAPI Spec Server URL
+Once your HTTPS deployment is live (e.g. https://api.codeguard.ai), update your OpenAPI spec:
+
+yaml
+Copy
+Edit
+servers:
+  - url: https://api.codeguard.ai
+Or for direct IP (only valid if you secure it with SSL):
+
+yaml
+Copy
+Edit
+servers:
+  - url: https://34.55.167.13
+⚠️ You must ensure that your server is reachable on https://34.55.167.13, not http://.
+
+🧪 How to Check HTTPS Is Working
+Try visiting:
+
+cpp
+Copy
+Edit
+https://34.55.167.13
+If your browser shows a secure connection and you can access /audit, /health, or /docs without warnings, you're good.
+
+If not, you need to:
+
+Enable HTTPS on your server
+
+Get an SSL certificate (e.g. via Let’s Encrypt, Cloudflare, or platform-provided)
+
+💡 Suggested Path Forward
+If you're hosting on Replit (which defaults to HTTP on custom ports):
+
+➤ Recommended:
+Deploy your FastAPI backend on a HTTPS-compatible platform:
+
+Render (easy HTTPS + port 443)
+
+Fly.io (low-latency, SSL out of the box)
+
+Vercel (via Python serverless)
+
+Or get a domain and install HTTPS on Replit manually (complex)
+
+✅ Once HTTPS is Set Up
+Change the servers: URL in your OpenAPI spec to https://your-domain.com
+
+Host the updated spec at https://your-domain.com/.well-known/openapi.yaml
+
+Reconnect the GPT Action using the new HTTPS URL
+
+Test again

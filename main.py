@@ -83,10 +83,11 @@ async def health_check():
 
 if __name__ == "__main__":
     # Run the application
+    port = int(os.getenv("PORT", 5000))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=True,
         log_level="info"
     )
