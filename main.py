@@ -457,7 +457,8 @@ async def improve_code_with_ai(request: dict):
             ) for fix in fixes
         ]
         
-        improver = get_code_improver()
+        # Use multi-AI manager for better performance and fallback
+        multi_ai = get_multi_ai_manager()
         improvement_request = CodeImprovementRequest(
             original_code=original_code,
             filename=filename,
@@ -467,7 +468,11 @@ async def improve_code_with_ai(request: dict):
             preserve_functionality=True
         )
         
-        response = improver.improve_code(improvement_request)
+        response = multi_ai.improve_code_with_provider(
+            improvement_request, 
+            provider_name=ai_provider,
+            api_key=ai_api_key
+        )
         
         return {
             "improved_code": response.improved_code,
