@@ -578,6 +578,324 @@ async def apply_bulk_fixes(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bulk fix failed: {str(e)}")
 
+@app.post("/reports/improvement-analysis")
+async def generate_improvement_report(request: dict):
+    """
+    Generate a comprehensive improvement report showing all issues with original code,
+    line numbers, and detailed recommendations for fixes.
+    """
+    try:
+        files = request.get("files", [])
+        include_ai_suggestions = request.get("include_ai_suggestions", True)
+        report_format = request.get("format", "markdown")  # markdown, json, html
+        
+        if not files:
+            raise HTTPException(status_code=400, detail="Files are required for analysis")
+        
+        # Perform comprehensive audit using existing audit endpoint
+        audit_data = {
+            "files": files,
+            "options": {
+                "analysis_level": "strict",
+                "framework": "general",
+                "target_platform": "general"
+            }
+        }
+        
+        # Use the existing audit engine directly
+        from enhanced_audit import EnhancedAuditEngine
+        from models import AuditRequest, CodeFile, AuditOptions
+        
+        audit_engine = EnhancedAuditEngine()
+        audit_request = AuditRequest(
+            files=[CodeFile(filename=f["filename"], content=f["content"]) for f in files],
+            options=AuditOptions(level="strict", framework="general", target="general")
+        )
+        audit_response = audit_engine.analyze_code(audit_request)
+        
+        # Generate AI improvement suggestions if requested
+        ai_suggestions = {}
+        if include_ai_suggestions:
+            multi_ai = get_multi_ai_manager()
+            for file_data in files:
+                filename = file_data["filename"]
+                content = file_data["content"]
+                
+                # Get file-specific issues
+                file_issues = [issue for issue in audit_response.issues if issue.filename == filename]
+                
+                if file_issues:
+                    # Create improvement request
+                    improvement_request = CodeImprovementRequest(
+                        original_code=content,
+                        filename=filename,
+                        issues=file_issues[:10],  # Limit to top 10 issues for performance
+                        fixes=[],
+                        improvement_level="moderate"
+                    )
+                    
+                    try:
+                        ai_response = await multi_ai.improve_code_with_provider(improvement_request, "openai")
+                        ai_suggestions[filename] = {
+                            "improved_code": ai_response.improved_code,
+                            "summary": ai_response.improvement_summary,
+                            "confidence": ai_response.confidence_score
+                        }
+                    except Exception as e:
+                        ai_suggestions[filename] = {
+                            "error": f"AI analysis failed: {str(e)}",
+                            "improved_code": content,
+                            "summary": "Manual review recommended",
+                            "confidence": 0.0
+                        }
+        
+        # Generate the report
+        report_data = _generate_improvement_report_data(audit_response, files, ai_suggestions)
+        
+        if report_format == "markdown":
+            formatted_report = _format_report_as_markdown(report_data)
+        elif report_format == "html":
+            formatted_report = _format_report_as_html(report_data)
+        else:  # json
+            formatted_report = report_data
+        
+        return {
+            "report": formatted_report,
+            "format": report_format,
+            "total_issues": len(audit_response.issues),
+            "total_files": len(files),
+            "severity_breakdown": _get_severity_breakdown(audit_response.issues),
+            "issue_categories": _categorize_fixes_by_type([issue.__dict__ for issue in audit_response.issues]),
+            "ai_suggestions_included": include_ai_suggestions
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
+
+def _generate_improvement_report_data(audit_response, files, ai_suggestions):
+    """Generate structured report data"""
+    files_dict = {f["filename"]: f["content"] for f in files}
+    
+    report_data = {
+        "title": "CodeGuard Improvement Analysis Report",
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "summary": {
+            "total_files": len(files),
+            "total_issues": len(audit_response.issues),
+            "total_fixes": len(audit_response.fixes)
+        },
+        "files": []
+    }
+    
+    # Group issues by file
+    files_with_issues = {}
+    for issue in audit_response.issues:
+        filename = issue.filename
+        if filename not in files_with_issues:
+            files_with_issues[filename] = []
+        files_with_issues[filename].append(issue)
+    
+    # Process each file
+    for filename, content in files_dict.items():
+        file_issues = files_with_issues.get(filename, [])
+        lines = content.split('\n')
+        
+        file_data = {
+            "filename": filename,
+            "line_count": len(lines),
+            "issue_count": len(file_issues),
+            "issues": [],
+            "ai_suggestion": ai_suggestions.get(filename, {})
+        }
+        
+        # Process each issue
+        for issue in file_issues:
+            line_num = issue.line
+            original_line = lines[line_num - 1] if 0 < line_num <= len(lines) else ""
+            
+            # Get context (2 lines before and after)
+            context_start = max(0, line_num - 3)
+            context_end = min(len(lines), line_num + 2)
+            context_lines = []
+            
+            for i in range(context_start, context_end):
+                prefix = ">>> " if i == line_num - 1 else "    "
+                context_lines.append(f"{prefix}{i+1:3d}: {lines[i]}")
+            
+            issue_data = {
+                "line": line_num,
+                "type": issue.type,
+                "severity": issue.severity,
+                "source": issue.source,
+                "description": issue.description,
+                "original_code": original_line.strip(),
+                "context": "\n".join(context_lines),
+                "recommendations": _get_issue_recommendations(issue)
+            }
+            
+            file_data["issues"].append(issue_data)
+        
+        # Sort issues by line number
+        file_data["issues"].sort(key=lambda x: x["line"])
+        report_data["files"].append(file_data)
+    
+    return report_data
+
+def _get_issue_recommendations(issue):
+    """Get specific recommendations for different issue types"""
+    recommendations = {
+        "syntax": "Fix syntax error according to Python language specification",
+        "style": "Follow PEP 8 style guidelines for consistent code formatting",
+        "security": "Address security vulnerability to prevent potential exploits",
+        "performance": "Optimize code for better runtime performance",
+        "ml_pattern": "Apply machine learning best practices and patterns",
+        "rl_pattern": "Follow reinforcement learning coding standards"
+    }
+    
+    # Get specific recommendations based on issue details
+    if "import" in issue.description.lower():
+        return "Organize imports according to PEP 8: standard library, third-party, local imports"
+    elif "unused" in issue.description.lower():
+        return "Remove unused variables/imports to improve code cleanliness"
+    elif "line too long" in issue.description.lower():
+        return "Break long lines at 88 characters using parentheses or line continuation"
+    elif "missing docstring" in issue.description.lower():
+        return "Add descriptive docstrings following Google or NumPy style"
+    elif "complexity" in issue.description.lower():
+        return "Reduce cyclomatic complexity by extracting functions or simplifying logic"
+    
+    return recommendations.get(issue.type, "Review and fix according to coding standards")
+
+def _format_report_as_markdown(report_data):
+    """Format report data as Markdown"""
+    md = f"""# {report_data['title']}
+
+**Generated:** {report_data['generated_at']}
+
+## Summary
+- **Files Analyzed:** {report_data['summary']['total_files']}
+- **Total Issues:** {report_data['summary']['total_issues']}
+- **Total Fixes:** {report_data['summary']['total_fixes']}
+
+"""
+    
+    for file_data in report_data['files']:
+        if file_data['issue_count'] == 0:
+            continue
+            
+        md += f"""## File: `{file_data['filename']}`
+**Lines:** {file_data['line_count']} | **Issues:** {file_data['issue_count']}
+
+"""
+        
+        # Add AI suggestion if available
+        if file_data.get('ai_suggestion', {}).get('summary'):
+            ai_data = file_data['ai_suggestion']
+            md += f"""### AI Analysis Summary
+**Confidence:** {ai_data.get('confidence', 0):.1%}
+**Recommendations:** {ai_data.get('summary', 'No summary available')}
+
+"""
+        
+        # Add issues
+        for i, issue in enumerate(file_data['issues'], 1):
+            severity_icon = {"error": "🔴", "warning": "🟡", "info": "🔵"}.get(issue['severity'], "⚪")
+            
+            md += f"""### Issue #{i}: Line {issue['line']} {severity_icon}
+**Type:** {issue['type']} | **Source:** {issue['source']} | **Severity:** {issue['severity']}
+
+**Problem:** {issue['description']}
+
+**Original Code:**
+```python
+{issue['original_code']}
+```
+
+**Context:**
+```python
+{issue['context']}
+```
+
+**Recommendation:** {issue['recommendations']}
+
+---
+
+"""
+    
+    return md
+
+def _format_report_as_html(report_data):
+    """Format report data as HTML"""
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>{report_data['title']}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+        .header {{ background: #f8f9fa; padding: 20px; border-radius: 5px; }}
+        .file-section {{ margin: 30px 0; border: 1px solid #ddd; border-radius: 5px; }}
+        .file-header {{ background: #e9ecef; padding: 15px; font-weight: bold; }}
+        .issue {{ margin: 15px; padding: 15px; border-left: 4px solid #007bff; }}
+        .issue.error {{ border-left-color: #dc3545; }}
+        .issue.warning {{ border-left-color: #ffc107; }}
+        .code {{ background: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; }}
+        .severity {{ padding: 3px 8px; border-radius: 3px; color: white; font-size: 12px; }}
+        .severity.error {{ background: #dc3545; }}
+        .severity.warning {{ background: #ffc107; color: black; }}
+        .severity.info {{ background: #17a2b8; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{report_data['title']}</h1>
+        <p><strong>Generated:</strong> {report_data['generated_at']}</p>
+        <p><strong>Files:</strong> {report_data['summary']['total_files']} | 
+           <strong>Issues:</strong> {report_data['summary']['total_issues']}</p>
+    </div>
+"""
+    
+    for file_data in report_data['files']:
+        if file_data['issue_count'] == 0:
+            continue
+            
+        html += f"""
+    <div class="file-section">
+        <div class="file-header">
+            📄 {file_data['filename']} 
+            <span style="float: right;">{file_data['issue_count']} issues</span>
+        </div>
+"""
+        
+        for issue in file_data['issues']:
+            html += f"""
+        <div class="issue {issue['severity']}">
+            <h4>Line {issue['line']}: {issue['type']} 
+                <span class="severity {issue['severity']}">{issue['severity'].upper()}</span>
+            </h4>
+            <p><strong>Problem:</strong> {issue['description']}</p>
+            <p><strong>Original Code:</strong></p>
+            <div class="code">{issue['original_code']}</div>
+            <p><strong>Recommendation:</strong> {issue['recommendations']}</p>
+        </div>
+"""
+        
+        html += "    </div>"
+    
+    html += """
+</body>
+</html>"""
+    
+    return html
+
+def _get_severity_breakdown(issues):
+    """Get breakdown of issues by severity"""
+    breakdown = {"error": 0, "warning": 0, "info": 0}
+    for issue in issues:
+        severity = issue.severity.lower()
+        if severity in breakdown:
+            breakdown[severity] += 1
+    return breakdown
+
 @app.post("/improve/project")
 async def improve_entire_project(request: dict):
     """

@@ -52,6 +52,10 @@ export function activate(context: vscode.ExtensionContext) {
         await showBulkFixMenu();
     });
     
+    const generateImprovementReportCommand = vscode.commands.registerCommand('codeguard.generateImprovementReport', async () => {
+        await generateComprehensiveReport();
+    });
+    
     // Register event listeners
     const onSaveListener = vscode.workspace.onDidSaveTextDocument(async (document) => {
         if (document.languageId === 'python' && configManager.getAuditOnSave()) {
