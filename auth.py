@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Security, status
+from fastapi import HTTPException, Security, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import hashlib
@@ -6,7 +6,7 @@ import hmac
 from typing import Optional
 
 # Security scheme for API key authentication
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 def get_api_key_from_env() -> Optional[str]:
     """Get the API key from environment variables."""

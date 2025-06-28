@@ -94,6 +94,10 @@ Preferred communication style: Simple, everyday language.
 - Privacy policy endpoint /privacy-policy serving comprehensive data protection information
 - Terms of service endpoint /terms-of-service covering usage rights and responsibilities
 - Both documents designed for OpenAI GPT Actions integration requirements
+- **June 28, 2025**: Fixed Pydantic v2 compatibility warnings and authentication issues
+- Updated Field definitions to use json_schema_extra instead of deprecated schema_extra
+- Fixed authentication to allow requests without headers in development mode
+- Authentication now works properly for automated tools and OpenAI GPT Actions
 
 ## Deployment Status
 
