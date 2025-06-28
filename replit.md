@@ -210,6 +210,12 @@ Preferred communication style: Simple, everyday language.
 - VSCode extension timeout increased to 60s with progressive fallback handling
 - System filters common false positives like line length, whitespace, and formatting issues
 - Maintains all critical security issues (pickle, eval, exec) and error-level problems
+- **June 28, 2025**: Comprehensive Report False Positive Filtering completed
+- Added `apply_false_positive_filtering` parameter to `/reports/improvement-analysis` endpoint
+- VSCode extension updated with filtering option in comprehensive report generation
+- Uses same fast rule-based filtering as main audit endpoint (no additional ChatGPT API calls)
+- Ensures consistency between VSCode diagnostics and detailed reports
+- Users can choose filtered reports (default) or unfiltered reports for debugging
 
 ## Deployment Status
 

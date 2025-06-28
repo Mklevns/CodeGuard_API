@@ -61,7 +61,7 @@ class FalsePositiveFilter:
                     filtered_issues.append(issue)
                     continue
                 
-                # Skip common false positive patterns
+                # Skip common false positive patterns - updated to match actual issue descriptions
                 skip_patterns = [
                     'line too long',  # E501: line too long
                     'missing whitespace',  # E225: missing whitespace around operator
@@ -73,10 +73,15 @@ class FalsePositiveFilter:
                     'whitespace before',  # E201: whitespace after '('
                     'whitespace after',  # E202: whitespace before ')'
                     'blank line contains whitespace',  # W293: blank line contains whitespace
+                    'code formatting can be improved',  # Generic formatting issues
+                    'import statements can be better organized',  # Import organization
+                    'unused import',  # Filter unused imports that might be dynamic
+                    'imported but unused',  # F401 unused imports
+                    'indentation is not a multiple',  # E111, E112, E113 indentation issues
+                    'continuation line',  # E124, E125, E126, E127, E128 line continuation
                 ]
                 
                 if any(pattern in description_lower for pattern in skip_patterns):
-                    print(f"DEBUG: Filtering out issue: {issue.description[:50]}...")
                     continue  # Skip these common style issues
                 
                 # Keep all other issues
