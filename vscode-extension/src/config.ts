@@ -57,6 +57,11 @@ export class ConfigManager {
         await config.update('enableFalsePositiveFiltering', enabled, vscode.ConfigurationTarget.Global);
     }
     
+    getFalsePositiveTimeout(): number {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get<number>('falsePositiveTimeout') ?? 45;
+    }
+    
     getIgnoreRules(): string[] {
         const config = vscode.workspace.getConfiguration('codeguard');
         return config.get<string[]>('ignoreRules') || [];

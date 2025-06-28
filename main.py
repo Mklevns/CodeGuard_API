@@ -93,10 +93,30 @@ async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
         # Analyze request for telemetry
         request_analysis = metrics_analyzer.analyze_request(request)
         
-        # Perform code analysis with configurable AI validation
+        # Apply timeout logic for AI validation
+        analysis_timeout = 40  # Total analysis timeout in seconds
+        
+        # Perform code analysis with configurable AI validation and timeout
         from enhanced_audit import EnhancedAuditEngine
+        import asyncio
+        
         engine = EnhancedAuditEngine(use_false_positive_filter=validate_with_ai)
-        response = engine.analyze_code(request)
+        
+        try:
+            # Run analysis with timeout
+            response = await asyncio.wait_for(
+                asyncio.to_thread(engine.analyze_code, request),
+                timeout=analysis_timeout
+            )
+        except asyncio.TimeoutError:
+            # Fallback to analysis without AI filtering if timeout
+            if validate_with_ai:
+                print(f"AI validation timed out after {analysis_timeout}s, falling back to standard analysis")
+                engine_fallback = EnhancedAuditEngine(use_false_positive_filter=False)
+                response = engine_fallback.analyze_code(request)
+                response.summary += " (AI validation timed out)"
+            else:
+                raise HTTPException(status_code=504, detail="Analysis timed out")
         
         # Calculate analysis time
         analysis_time = (time.time() - start_time) * 1000  # Convert to ms

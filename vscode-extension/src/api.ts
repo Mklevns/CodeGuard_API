@@ -47,7 +47,7 @@ export class CodeGuardAPI {
     constructor(configManager: ConfigManager) {
         this.configManager = configManager;
         this.client = axios.create({
-            timeout: 30000,
+            timeout: 60000, // Increased timeout for ChatGPT false positive filtering
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -93,10 +93,28 @@ export class CodeGuardAPI {
         };
         
         // Use appropriate endpoint based on false positive filtering setting
-        const endpoint = this.configManager.getFalsePositiveFiltering() ? '/audit' : '/audit/no-filter';
+        const useFalsePositiveFiltering = this.configManager.getFalsePositiveFiltering();
+        const endpoint = useFalsePositiveFiltering ? '/audit' : '/audit/no-filter';
         
-        const response = await this.client.post(endpoint, requestData);
-        return response.data;
+        // Get user-configured timeout for false positive filtering
+        const falsePositiveTimeout = this.configManager.getFalsePositiveTimeout();
+        const timeout = useFalsePositiveFiltering ? falsePositiveTimeout * 1000 : 30000;
+        
+        try {
+            const response = await this.client.post(endpoint, requestData, { timeout });
+            return response.data;
+        } catch (error: any) {
+            // If timeout with false positive filtering enabled, try without filtering
+            if (error.code === 'ECONNABORTED' && useFalsePositiveFiltering) {
+                console.log(`AI filtering timed out after ${falsePositiveTimeout}s, retrying without filtering...`);
+                const fallbackResponse = await this.client.post('/audit/no-filter', requestData, { timeout: 30000 });
+                return {
+                    ...fallbackResponse.data,
+                    summary: fallbackResponse.data.summary + ' (AI filtering timed out - using standard analysis)'
+                };
+            }
+            throw error;
+        }
     }
     
     async getRulesSummary(): Promise<any> {

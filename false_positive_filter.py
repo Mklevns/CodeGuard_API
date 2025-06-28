@@ -43,21 +43,48 @@ class FalsePositiveFilter:
         if not self._openai_client or not issues:
             return issues, fixes
         
+        # Quick return for small number of issues to avoid timeout
+        if len(issues) <= 3:
+            return issues, fixes
+        
         try:
-            # Group issues by file for efficient analysis
-            issues_by_file = self._group_issues_by_file(issues, code_files)
+            # Only validate high-severity issues to reduce processing time
+            high_priority_issues = [issue for issue in issues if issue.severity in ['error', 'warning']]
+            low_priority_issues = [issue for issue in issues if issue.severity not in ['error', 'warning']]
             
-            validated_issues = []
+            if not high_priority_issues:
+                return issues, fixes
+            
+            # Group high-priority issues by file for efficient analysis
+            issues_by_file = self._group_issues_by_file(high_priority_issues, code_files)
+            
+            validated_high_priority = []
             validated_fixes = []
             
-            for file_info in issues_by_file:
+            # Process only the first file to avoid timeout
+            if issues_by_file:
+                file_info = issues_by_file[0]  # Process most important file first
                 file_validated_issues, file_validated_fixes = self._validate_file_issues(
                     file_info, fixes
                 )
-                validated_issues.extend(file_validated_issues)
+                validated_high_priority.extend(file_validated_issues)
                 validated_fixes.extend(file_validated_fixes)
+                
+                # Add remaining files without validation if there are multiple
+                if len(issues_by_file) > 1:
+                    for file_info in issues_by_file[1:]:
+                        validated_high_priority.extend(file_info['issues'])
             
-            return validated_issues, validated_fixes
+            # Combine validated high-priority with all low-priority issues
+            all_validated_issues = validated_high_priority + low_priority_issues
+            
+            # Add all fixes for low-priority issues
+            low_priority_lines = {issue.line for issue in low_priority_issues}
+            for fix in fixes:
+                if hasattr(fix, 'line') and fix.line in low_priority_lines:
+                    validated_fixes.append(fix)
+            
+            return all_validated_issues, validated_fixes
             
         except Exception as e:
             print(f"Warning: False positive filtering failed: {e}")
@@ -95,13 +122,13 @@ class FalsePositiveFilter:
             # Create validation prompt
             prompt = self._build_validation_prompt(filename, content, issues)
             
-            # Get ChatGPT analysis
+            # Get ChatGPT analysis with timeout
             response = self._openai_client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a code analysis expert. Your job is to validate whether detected issues are true positives or false positives. Be conservative - only mark something as a false positive if you're very confident it's not a real issue."
+                        "content": "You are a code analysis expert. Quickly validate whether detected issues are true positives or false positives. Be conservative - only mark as false positive if very confident. Respond concisely."
                     },
                     {
                         "role": "user",
@@ -109,7 +136,8 @@ class FalsePositiveFilter:
                     }
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.1  # Low temperature for consistent analysis
+                temperature=0.1,  # Low temperature for consistent analysis
+                max_tokens=1000   # Limit response size for faster processing
             )
             
             # Parse validation results

@@ -119,6 +119,11 @@
           "default": true,
           "description": "Use ChatGPT to filter out potential false positive issues before reporting."
         },
+        "codeguard.falsePositiveTimeout": {
+          "type": "number",
+          "default": 45,
+          "description": "Timeout in seconds for ChatGPT false positive filtering (default: 45s)."
+        },
         "codeguard.analysisLevel": {
           "type": "string",
           "enum": ["basic", "standard", "strict"],
