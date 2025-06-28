@@ -13,6 +13,7 @@ from historical_timeline import get_timeline_generator
 from gpt_connector import get_gpt_connector, get_issue_explainer
 from project_templates import MLProjectGenerator
 from chatgpt_integration import get_code_improver, get_batch_improver, CodeImprovementRequest
+from multi_ai_integration import get_multi_ai_manager
 import uuid
 import time
 
@@ -413,20 +414,21 @@ async def terms_of_service():
         raise HTTPException(status_code=404, detail="Terms of service not found")
 
 @app.post("/improve/code")
-async def improve_code_with_chatgpt(request: dict):
+async def improve_code_with_ai(request: dict):
     """
-    Use ChatGPT to implement CodeGuard suggestions and improve code quality.
+    Use AI (OpenAI, Gemini, or Claude) to implement CodeGuard suggestions and improve code quality.
     
-    Requires an OPENAI_API_KEY environment variable for full functionality.
-    Falls back to auto-fixable improvements when OpenAI is unavailable.
+    Supports multiple AI providers with fallback functionality.
     """
     try:
         # Extract request data
-        original_code = request.get("code", "")
+        original_code = request.get("original_code", request.get("code", ""))
         filename = request.get("filename", "code.py")
         issues = request.get("issues", [])
         fixes = request.get("fixes", [])
         improvement_level = request.get("improvement_level", "moderate")
+        ai_provider = request.get("ai_provider", "openai")
+        ai_api_key = request.get("ai_api_key")
         
         if not original_code:
             raise HTTPException(status_code=400, detail="Code content is required")

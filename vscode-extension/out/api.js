@@ -105,20 +105,28 @@ class CodeGuardAPI {
         return response.data.project;
     }
     async improveCode(originalCode, filename, issues, fixes) {
+        const aiProvider = this.configManager.getAiProvider();
+        const aiApiKey = await this.configManager.getCurrentAiApiKey();
         const response = await this.client.post('/improve/code', {
             original_code: originalCode,
             filename,
             issues,
             fixes,
             improvement_level: 'moderate',
-            preserve_functionality: true
+            preserve_functionality: true,
+            ai_provider: aiProvider,
+            ai_api_key: aiApiKey
         });
         return response.data;
     }
     async improveProject(files, auditResults) {
+        const aiProvider = this.configManager.getAiProvider();
+        const aiApiKey = await this.configManager.getCurrentAiApiKey();
         const response = await this.client.post('/improve/project', {
             files,
-            audit_results: auditResults
+            audit_results: auditResults,
+            ai_provider: aiProvider,
+            ai_api_key: aiApiKey
         });
         return response.data;
     }

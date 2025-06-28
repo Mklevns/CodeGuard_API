@@ -63,6 +63,35 @@ class ConfigManager {
             vscode.window.showInformationMessage('CodeGuard API key saved securely');
         }
     }
+    getAiProvider() {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get('aiProvider') || 'openai';
+    }
+    async getOpenAiApiKey() {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get('openaiApiKey');
+    }
+    async getGeminiApiKey() {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get('geminiApiKey');
+    }
+    async getClaudeApiKey() {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get('claudeApiKey');
+    }
+    async getCurrentAiApiKey() {
+        const provider = this.getAiProvider();
+        switch (provider) {
+            case 'openai':
+                return this.getOpenAiApiKey();
+            case 'gemini':
+                return this.getGeminiApiKey();
+            case 'claude':
+                return this.getClaudeApiKey();
+            default:
+                return this.getOpenAiApiKey();
+        }
+    }
 }
 exports.ConfigManager = ConfigManager;
 ConfigManager.API_KEY_SECRET = 'codeguard.apiKey';

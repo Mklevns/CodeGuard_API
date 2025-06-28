@@ -76,7 +76,7 @@ class OpenAIProvider(AIProvider):
                 max_tokens=4000
             )
             
-            improved_code = response.choices[0].message.content
+            improved_code = response.choices[0].message.content or request.original_code
             
             return CodeImprovementResponse(
                 improved_code=improved_code,
