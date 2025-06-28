@@ -132,6 +132,21 @@ class CodeGuardAPI {
         });
         return response.data;
     }
+    async bulkFix(originalCode, filename, fixType, issues) {
+        const aiProvider = this.configManager.getAiProvider();
+        const aiApiKey = await this.configManager.getCurrentAiApiKey();
+        const response = await this.client.post('/improve/bulk-fix', {
+            original_code: originalCode,
+            filename,
+            fix_type: fixType,
+            issues,
+            ai_provider: aiProvider,
+            ai_api_key: aiApiKey
+        }, {
+            timeout: 40000 // Extended timeout for bulk operations
+        });
+        return response.data;
+    }
     async auditAndImprove(files, options) {
         const requestData = {
             files,

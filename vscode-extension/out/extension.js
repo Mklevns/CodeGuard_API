@@ -41,6 +41,9 @@ function activate(context) {
     const showFixMenuCommand = vscode.commands.registerCommand('codeguard.showFixMenu', async () => {
         await showFixSelectionMenu();
     });
+    const bulkFixCommand = vscode.commands.registerCommand('codeguard.bulkFixByType', async () => {
+        await showBulkFixMenu();
+    });
     // Register event listeners
     const onSaveListener = vscode.workspace.onDidSaveTextDocument(async (document) => {
         if (document.languageId === 'python' && configManager.getAuditOnSave()) {
@@ -48,7 +51,7 @@ function activate(context) {
         }
     });
     // Add to context subscriptions
-    context.subscriptions.push(runAuditCommand, clearDiagnosticsCommand, generateReportCommand, setupProjectCommand, applySingleFixCommand, improveWithChatGPTCommand, showFixMenuCommand, onSaveListener, diagnosticsManager.diagnosticCollection);
+    context.subscriptions.push(runAuditCommand, clearDiagnosticsCommand, generateReportCommand, setupProjectCommand, applySingleFixCommand, improveWithChatGPTCommand, showFixMenuCommand, bulkFixCommand, onSaveListener, diagnosticsManager.diagnosticCollection);
     // Show welcome message
     vscode.window.showInformationMessage('CodeGuard ML/RL Auditor is ready!');
 }
@@ -283,6 +286,101 @@ async function applySpecificChatGPTFix(diagnostic) {
     }
     catch (error) {
         vscode.window.showErrorMessage(`Failed to apply ChatGPT fix: ${error}`);
+    }
+}
+async function showBulkFixMenu() {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) {
+        vscode.window.showWarningMessage('No active file');
+        return;
+    }
+    // Get current diagnostics for the file
+    const diagnostics = diagnosticsManager.getDiagnosticsForFile(activeEditor.document.uri);
+    if (!diagnostics || diagnostics.length === 0) {
+        vscode.window.showInformationMessage('No CodeGuard issues found. Run audit first.');
+        return;
+    }
+    // Group diagnostics by type
+    const issueGroups = {};
+    diagnostics.forEach(diagnostic => {
+        const type = diagnostic.source || 'unknown';
+        if (!issueGroups[type]) {
+            issueGroups[type] = [];
+        }
+        issueGroups[type].push(diagnostic);
+    });
+    // Create quick pick items for each issue type
+    const groupItems = Object.keys(issueGroups).map(type => ({
+        label: `${type} (${issueGroups[type].length} instances)`,
+        description: `Fix all ${issueGroups[type].length} instances of ${type} issues`,
+        detail: `Lines: ${issueGroups[type].map(d => d.range.start.line + 1).join(', ')}`,
+        type: type,
+        count: issueGroups[type].length,
+        diagnostics: issueGroups[type]
+    }));
+    const selected = await vscode.window.showQuickPick(groupItems, {
+        placeHolder: 'Select issue type to fix all instances with AI',
+        matchOnDescription: true,
+        matchOnDetail: true
+    });
+    if (selected) {
+        await applyBulkFixForType(selected.type, selected.diagnostics);
+    }
+}
+async function applyBulkFixForType(fixType, diagnostics) {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor)
+        return;
+    try {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Bulk Fix: ${fixType}`,
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ increment: 0, message: `Analyzing ${diagnostics.length} instances...` });
+            const filename = activeEditor.document.fileName.split('/').pop() || 'untitled.py';
+            const content = activeEditor.document.getText();
+            // Convert diagnostics to issues for the API
+            const issues = diagnostics.map(diagnostic => ({
+                type: diagnostic.source || fixType,
+                severity: diagnostic.severity === vscode.DiagnosticSeverity.Error ? 'error' : 'warning',
+                line: diagnostic.range.start.line + 1,
+                column: diagnostic.range.start.character + 1,
+                description: diagnostic.message,
+                source: diagnostic.source,
+                code: diagnostic.code
+            }));
+            progress.report({ increment: 30, message: `Getting AI fixes for ${fixType}...` });
+            // Get bulk fixes from API
+            const improvement = await api.bulkFix(content, filename, fixType, issues);
+            progress.report({ increment: 80, message: "Applying bulk fixes..." });
+            // Show confirmation dialog
+            const apply = await vscode.window.showInformationMessage(`Bulk Fix Results:\n${improvement.improvement_summary}\n\nFixed ${improvement.instances_fixed} instances on lines: ${improvement.fixed_lines?.join(', ')}\n\nConfidence: ${Math.round(improvement.confidence_score * 100)}%`, 'Preview Changes', 'Apply All Fixes', 'Dismiss');
+            if (apply === 'Preview Changes') {
+                // Show diff view
+                const doc = await vscode.workspace.openTextDocument({
+                    content: improvement.improved_code,
+                    language: 'python'
+                });
+                await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+            }
+            else if (apply === 'Apply All Fixes') {
+                // Apply all the fixes
+                const edit = new vscode.WorkspaceEdit();
+                const fullRange = new vscode.Range(0, 0, activeEditor.document.lineCount, 0);
+                edit.replace(activeEditor.document.uri, fullRange, improvement.improved_code);
+                await vscode.workspace.applyEdit(edit);
+                // Clear all diagnostics of this type
+                diagnostics.forEach(diagnostic => {
+                    diagnosticsManager.clearSpecificDiagnostic(activeEditor.document.uri, diagnostic);
+                });
+                vscode.window.showInformationMessage(`Successfully applied ${improvement.instances_fixed} ${fixType} fixes`);
+            }
+            progress.report({ increment: 100, message: "Complete!" });
+        });
+    }
+    catch (error) {
+        vscode.window.showErrorMessage(`Failed to apply bulk fixes: ${error}`);
     }
 }
 async function applyTargetedFix(editor, improvement, diagnostic) {
