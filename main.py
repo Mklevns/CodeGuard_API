@@ -12,6 +12,7 @@ from dashboard import get_dashboard
 from historical_timeline import get_timeline_generator
 from gpt_connector import get_gpt_connector, get_issue_explainer
 from project_templates import MLProjectGenerator
+from chatgpt_integration import get_code_improver, get_batch_improver, CodeImprovementRequest
 import uuid
 import time
 
@@ -407,6 +408,234 @@ async def terms_of_service():
         return FileResponse(terms_path, media_type="text/markdown")
     else:
         raise HTTPException(status_code=404, detail="Terms of service not found")
+
+@app.post("/improve/code")
+async def improve_code_with_chatgpt(request: dict):
+    """
+    Use ChatGPT to implement CodeGuard suggestions and improve code quality.
+    
+    Requires an OPENAI_API_KEY environment variable for full functionality.
+    Falls back to auto-fixable improvements when OpenAI is unavailable.
+    """
+    try:
+        # Extract request data
+        original_code = request.get("code", "")
+        filename = request.get("filename", "code.py")
+        issues = request.get("issues", [])
+        fixes = request.get("fixes", [])
+        improvement_level = request.get("improvement_level", "moderate")
+        
+        if not original_code:
+            raise HTTPException(status_code=400, detail="Code content is required")
+        
+        # Convert dict issues/fixes to model objects for compatibility
+        from models import Issue, Fix
+        issue_objects = [
+            Issue(
+                filename=issue.get("filename", filename),
+                line=issue.get("line", 1),
+                type=issue.get("type", "unknown"),
+                description=issue.get("description", ""),
+                source=issue.get("source", "unknown"),
+                severity=issue.get("severity", "warning")
+            ) for issue in issues
+        ]
+        
+        fix_objects = [
+            Fix(
+                filename=fix.get("filename", filename),
+                line=fix.get("line", 1),
+                suggestion=fix.get("suggestion", ""),
+                diff=fix.get("diff"),
+                replacement_code=fix.get("replacement_code"),
+                auto_fixable=fix.get("auto_fixable", False)
+            ) for fix in fixes
+        ]
+        
+        improver = get_code_improver()
+        improvement_request = CodeImprovementRequest(
+            original_code=original_code,
+            filename=filename,
+            issues=issue_objects,
+            fixes=fix_objects,
+            improvement_level=improvement_level,
+            preserve_functionality=True
+        )
+        
+        response = improver.improve_code(improvement_request)
+        
+        return {
+            "improved_code": response.improved_code,
+            "applied_fixes": response.applied_fixes,
+            "improvement_summary": response.improvement_summary,
+            "confidence_score": response.confidence_score,
+            "warnings": response.warnings,
+            "original_issues_count": len(issues),
+            "fixes_applied_count": len(response.applied_fixes)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Code improvement failed: {str(e)}")
+
+@app.post("/improve/project")
+async def improve_entire_project(request: dict):
+    """
+    Improve multiple files in a project using ChatGPT and CodeGuard analysis.
+    
+    Performs audit on all files first, then applies AI-powered improvements.
+    """
+    try:
+        files = request.get("files", [])
+        improvement_level = request.get("improvement_level", "moderate")
+        
+        if not files:
+            raise HTTPException(status_code=400, detail="At least one file is required")
+        
+        # Convert to CodeFile objects
+        from models import CodeFile, AuditRequest
+        code_files = [
+            CodeFile(filename=f.get("filename", ""), content=f.get("content", ""))
+            for f in files
+        ]
+        
+        # First, run complete audit on all files
+        audit_request = AuditRequest(files=code_files)
+        audit_response = analyze_code(audit_request)
+        
+        # Then improve each file using ChatGPT
+        batch_improver = get_batch_improver()
+        improvements = batch_improver.improve_project(code_files, {
+            "issues": audit_response.issues,
+            "fixes": audit_response.fixes
+        })
+        
+        # Compile results
+        project_results = {
+            "original_audit": {
+                "summary": audit_response.summary,
+                "total_issues": len(audit_response.issues),
+                "total_fixes": len(audit_response.fixes)
+            },
+            "improvements": {},
+            "overall_summary": {
+                "files_processed": len(files),
+                "files_improved": 0,
+                "total_fixes_applied": 0,
+                "average_confidence": 0.0
+            }
+        }
+        
+        total_confidence = 0.0
+        files_improved = 0
+        total_fixes_applied = 0
+        
+        for filename, improvement in improvements.items():
+            project_results["improvements"][filename] = {
+                "improved_code": improvement.improved_code,
+                "applied_fixes": improvement.applied_fixes,
+                "improvement_summary": improvement.improvement_summary,
+                "confidence_score": improvement.confidence_score,
+                "warnings": improvement.warnings
+            }
+            
+            if improvement.applied_fixes:
+                files_improved += 1
+                total_fixes_applied += len(improvement.applied_fixes)
+            
+            total_confidence += improvement.confidence_score
+        
+        # Update overall summary
+        project_results["overall_summary"]["files_improved"] = files_improved
+        project_results["overall_summary"]["total_fixes_applied"] = total_fixes_applied
+        project_results["overall_summary"]["average_confidence"] = total_confidence / len(files) if files else 0.0
+        
+        return project_results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Project improvement failed: {str(e)}")
+
+@app.post("/audit-and-improve")
+async def audit_and_improve_combined(request: AuditRequest):
+    """
+    Combined endpoint that performs CodeGuard audit and ChatGPT improvements in one call.
+    
+    This is the most comprehensive endpoint for getting both analysis and AI-powered fixes.
+    """
+    try:
+        # Perform initial audit
+        audit_response = analyze_code(request)
+        
+        # Track telemetry for the audit
+        session_id = str(uuid.uuid4())
+        start_time = time.time()
+        
+        # Improve each file using ChatGPT
+        improvements = {}
+        batch_improver = get_batch_improver()
+        
+        if request.files:
+            project_improvements = batch_improver.improve_project(request.files, {
+                "issues": audit_response.issues,
+                "fixes": audit_response.fixes
+            })
+            
+            for filename, improvement in project_improvements.items():
+                improvements[filename] = {
+                    "improved_code": improvement.improved_code,
+                    "applied_fixes": improvement.applied_fixes,
+                    "improvement_summary": improvement.improvement_summary,
+                    "confidence_score": improvement.confidence_score,
+                    "warnings": improvement.warnings
+                }
+        
+        # Calculate improvement statistics
+        total_ai_fixes = sum(len(imp.get("applied_fixes", [])) for imp in improvements.values())
+        avg_confidence = sum(imp.get("confidence_score", 0) for imp in improvements.values()) / len(improvements) if improvements else 0.0
+        
+        # Record telemetry
+        processing_time = time.time() - start_time
+        framework = "unknown"
+        if request.options and request.options.framework:
+            framework = request.options.framework
+        else:
+            # Detect framework from code content
+            all_content = " ".join([f.content for f in request.files])
+            if "torch" in all_content or "pytorch" in all_content:
+                framework = "pytorch"
+            elif "tensorflow" in all_content or "tf." in all_content:
+                framework = "tensorflow"
+            elif "gym" in all_content:
+                framework = "gym"
+        
+        telemetry_collector.record_audit_session(
+            session_id=session_id,
+            files_count=len(request.files),
+            issues_found=len(audit_response.issues),
+            processing_time=processing_time,
+            framework=framework,
+            total_fixes=len(audit_response.fixes) + total_ai_fixes
+        )
+        
+        return {
+            "audit_results": {
+                "summary": audit_response.summary,
+                "issues": [issue.dict() for issue in audit_response.issues],
+                "fixes": [fix.dict() for fix in audit_response.fixes]
+            },
+            "ai_improvements": improvements,
+            "combined_summary": {
+                "session_id": session_id,
+                "total_issues_found": len(audit_response.issues),
+                "codeguard_fixes": len(audit_response.fixes),
+                "ai_fixes_applied": total_ai_fixes,
+                "average_ai_confidence": avg_confidence,
+                "processing_time_seconds": round(processing_time, 2),
+                "framework_detected": framework
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Combined audit and improvement failed: {str(e)}")
 
 if __name__ == "__main__":
     # Run the application - optimized for both development and Cloud Run
