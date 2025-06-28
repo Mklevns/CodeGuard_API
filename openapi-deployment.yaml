@@ -230,6 +230,8 @@ components:
         - line
         - type
         - description
+        - source
+        - severity
       properties:
         filename:
           type: string
@@ -242,12 +244,23 @@ components:
           example: 1
         type:
           type: string
-          enum: [error, style, best_practice, complexity, naming]
+          enum: [error, style, best_practice, complexity, naming, type_error, refactor, info]
           description: Type of issue
           example: "style"
         description:
           type: string
           description: Description of the issue
+          example: "F401: Unused import 'torch'"
+        source:
+          type: string
+          enum: [flake8, pylint, mypy, black, isort, ml_rules, system]
+          description: Analysis tool that detected the issue
+          example: "flake8"
+        severity:
+          type: string
+          enum: [error, warning, info]
+          description: Issue severity level
+          example: "warning"
           example: "F401: 'torch' imported but unused"
     
     Fix:

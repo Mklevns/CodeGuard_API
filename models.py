@@ -65,26 +65,47 @@ class AuditResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "summary": "2 issues found across 2 files",
+                "summary": "5 issues found across 2 files (1 errors, 4 warnings)",
                 "issues": [
                     {
                         "filename": "train.py",
                         "line": 1,
                         "type": "style",
-                        "description": "Unused import 'torch'"
+                        "description": "F401: Unused import 'torch'",
+                        "source": "flake8",
+                        "severity": "warning"
+                    },
+                    {
+                        "filename": "train.py",
+                        "line": 5,
+                        "type": "best_practice",
+                        "description": "Missing random seeding for reproducibility",
+                        "source": "ml_rules",
+                        "severity": "warning"
                     },
                     {
                         "filename": "utils.py",
                         "line": 1,
-                        "type": "best_practice",
-                        "description": "Missing function docstring"
+                        "type": "style",
+                        "description": "Import statements can be better organized",
+                        "source": "isort",
+                        "severity": "info"
                     }
                 ],
                 "fixes": [
                     {
                         "filename": "train.py",
                         "line": 1,
-                        "suggestion": "Remove unused import 'torch'"
+                        "suggestion": "Remove unused import 'torch'",
+                        "diff": "- import torch\n+",
+                        "auto_fixable": True
+                    },
+                    {
+                        "filename": "train.py",
+                        "line": 1,
+                        "suggestion": "Add seeding for reproducibility",
+                        "replacement_code": "torch.manual_seed(42)\nrandom.seed(42)",
+                        "auto_fixable": True
                     }
                 ]
             }
