@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import uvicorn
 import os
 from models import AuditRequest, AuditResponse
 from audit import analyze_code
+from auth import verify_api_key, get_current_user
 
 # Create FastAPI app
 app = FastAPI(
@@ -38,12 +39,13 @@ async def root():
     }
 
 @app.post("/audit", response_model=AuditResponse)
-async def audit_code(request: AuditRequest):
+async def audit_code(request: AuditRequest, current_user: dict = Depends(get_current_user)):
     """
     Analyzes submitted Python code files and returns a report of issues and suggestions.
     
     Args:
         request: AuditRequest containing files to analyze
+        current_user: Authenticated user information
         
     Returns:
         AuditResponse with summary, issues, and fix suggestions
@@ -64,6 +66,15 @@ async def get_openapi_spec():
         return FileResponse(openapi_path, media_type="application/yaml")
     else:
         raise HTTPException(status_code=404, detail="OpenAPI specification not found")
+
+@app.get("/auth/status")
+async def auth_status(current_user: dict = Depends(get_current_user)):
+    """Check authentication status and return user information."""
+    return {
+        "authenticated": True,
+        "message": "API key is valid",
+        "user_info": current_user
+    }
 
 @app.get("/health")
 async def health_check():

@@ -18,6 +18,8 @@ paths:
       description: |
         Analyzes one or more Python files for syntax errors, style issues, 
         and best practice violations using flake8 static analysis.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -78,6 +80,16 @@ paths:
                   detail:
                     type: string
                     example: "Invalid file format"
+        '401':
+          description: Unauthorized - invalid or missing API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Invalid API key"
         '500':
           description: Internal server error
           content:
@@ -88,6 +100,31 @@ paths:
                   detail:
                     type: string
                     example: "Analysis failed: flake8 not available"
+  /auth/status:
+    get:
+      operationId: checkAuthStatus
+      summary: Check authentication status
+      description: Verify if the provided API key is valid and return user information.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "API key is valid"
+                  user_info:
+                    type: object
+        '401':
+          description: Unauthorized - invalid or missing API key
   /health:
     get:
       operationId: healthCheck
@@ -227,3 +264,9 @@ components:
           items:
             $ref: "#/components/schemas/Fix"
           description: List of suggested fixes
+securitySchemes:
+  bearerAuth:
+    type: http
+    scheme: bearer
+    bearerFormat: API Key
+    description: "Provide your API key as a Bearer token in the Authorization header"
