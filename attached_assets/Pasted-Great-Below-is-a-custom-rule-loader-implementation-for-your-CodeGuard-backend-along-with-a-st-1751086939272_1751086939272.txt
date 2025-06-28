@@ -1,0 +1,204 @@
+Great! Below is a **custom rule loader implementation** for your CodeGuard backend along with a **starter set of ML-focused rule definitions**. This allows you (or users) to plug in new auditing rules **without changing the code**, just by adding or editing JSON/YAML files.
+
+---
+
+## 🧠 Goal
+
+* Let CodeGuard load rules from a JSON or YAML file.
+* Apply those rules to incoming code.
+* Return matching violations as structured `Issue` objects.
+
+---
+
+## ✅ 1. Rule Format (JSON-based)
+
+```json
+[
+  {
+    "name": "missing_seed",
+    "description": "Random seed not set — add `torch.manual_seed()` or similar.",
+    "pattern": "import torch",
+    "not_contains": ["torch.manual_seed"],
+    "severity": "warning",
+    "tags": ["reproducibility", "ml"]
+  },
+  {
+    "name": "wildcard_import",
+    "description": "Avoid wildcard imports like `from module import *`.",
+    "regex": "from\\s+\\w+\\s+import\\s+\\*",
+    "severity": "style",
+    "tags": ["readability", "style"]
+  },
+  {
+    "name": "no_logging",
+    "description": "Code uses print statements instead of logging.",
+    "regex": "print\\(",
+    "severity": "warning",
+    "tags": ["logging", "best_practice"]
+  },
+  {
+    "name": "pickle_usage",
+    "description": "Avoid using `pickle` — insecure for untrusted input.",
+    "contains": "import pickle",
+    "severity": "error",
+    "tags": ["security"]
+  }
+]
+```
+
+You can also support YAML by converting this to `.yaml` and using `PyYAML`.
+
+---
+
+## ✅ 2. `rule_loader.py` — Rule Loader Module
+
+```python
+import json
+import re
+from typing import List, Dict, Any
+from models import Issue
+
+def load_rules(path: str) -> List[Dict[str, Any]]:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def apply_rules(rules: List[Dict[str, Any]], filename: str, content: str) -> List[Issue]:
+    issues = []
+    lines = content.splitlines()
+    
+    for rule in rules:
+        rule_name = rule.get("name", "unnamed_rule")
+        description = rule.get("description", "No description.")
+        severity = rule.get("severity", "warning")
+        
+        # Scan by line
+        for idx, line in enumerate(lines, start=1):
+            matched = False
+            
+            if "pattern" in rule and rule["pattern"] in content:
+                if "not_contains" in rule:
+                    for exclude in rule["not_contains"]:
+                        if exclude not in content:
+                            matched = True
+                else:
+                    matched = True
+
+            if "contains" in rule and rule["contains"] in line:
+                matched = True
+
+            if "regex" in rule:
+                if re.search(rule["regex"], line):
+                    matched = True
+
+            if matched:
+                issues.append(Issue(
+                    filename=filename,
+                    line=idx,
+                    type=severity,
+                    description=f"[{rule_name}] {description}"
+                ))
+                break  # one match per rule per file
+
+    return issues
+```
+
+---
+
+## ✅ 3. Modify `audit.py` to Use Rule Loader
+
+```python
+from rule_loader import load_rules, apply_rules
+
+# Load once at startup (e.g. global)
+custom_rules = load_rules("rules/ml_rules.json")
+
+def analyze_code(request: AuditRequest) -> AuditResponse:
+    issues = []
+    fixes = []
+
+    for file in request.files:
+        # Add flake8 or static checks here (existing logic)
+
+        # Add custom rule-based checks
+        rule_issues = apply_rules(custom_rules, file.filename, file.content)
+        issues.extend(rule_issues)
+
+    summary = f"{len(issues)} issues found across {len(request.files)} files"
+    return AuditResponse(summary=summary, issues=issues, fixes=fixes)
+```
+
+---
+
+## 🧪 4. Example Input & Output
+
+### Code Submitted:
+
+```python
+import torch
+from torch import *
+import pickle
+
+print("Training...")
+```
+
+### Output from Rule Engine:
+
+```json
+{
+  "summary": "3 issues found across 1 file",
+  "issues": [
+    {
+      "filename": "example.py",
+      "line": 2,
+      "type": "style",
+      "description": "[wildcard_import] Avoid wildcard imports like `from module import *`."
+    },
+    {
+      "filename": "example.py",
+      "line": 3,
+      "type": "error",
+      "description": "[pickle_usage] Avoid using `pickle` — insecure for untrusted input."
+    },
+    {
+      "filename": "example.py",
+      "line": 5,
+      "type": "warning",
+      "description": "[no_logging] Code uses print statements instead of logging."
+    }
+  ],
+  "fixes": []
+}
+```
+
+---
+
+## 📁 Suggested File Layout
+
+```
+codeguard_backend/
+├── rules/
+│   └── ml_rules.json
+├── rule_loader.py
+├── audit.py
+├── models.py
+├── main.py
+```
+
+---
+
+## ✅ Benefits
+
+* 🔌 Pluggable rule system — just edit `ml_rules.json`
+* 👩‍🔬 Custom ML/RL audit rules — seed setting, logging, reproducibility
+* 📦 No need to modify code to add new rule logic
+* ⚙️ Extendable to YAML, scoring, severity thresholds, etc.
+
+---
+
+Would you like me to generate:
+
+* A **YAML version** of the rule file?
+* A **web UI** to create/edit rules?
+* A **GitHub Gist** or repo with this boilerplate?
+
+Let me know and I’ll package it up!

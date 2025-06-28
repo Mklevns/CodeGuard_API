@@ -1,0 +1,114 @@
+[
+  {
+    "name": "missing_seed",
+    "description": "Random seed not set — add torch.manual_seed() or similar for reproducibility",
+    "pattern": "import torch",
+    "not_contains": ["torch.manual_seed", "np.random.seed", "random.seed"],
+    "severity": "warning",
+    "tags": ["reproducibility", "ml"]
+  },
+  {
+    "name": "wildcard_import",
+    "description": "Avoid wildcard imports like 'from module import *' — makes code harder to debug",
+    "regex": "from\\s+\\w+\\s+import\\s+\\*",
+    "severity": "style",
+    "tags": ["readability", "style"]
+  },
+  {
+    "name": "print_logging",
+    "description": "Code uses print statements instead of proper logging",
+    "regex": "print\\s*\\(",
+    "severity": "warning",
+    "tags": ["logging", "best_practice"]
+  },
+  {
+    "name": "pickle_security",
+    "description": "Avoid using pickle — insecure for untrusted input, use json or joblib instead",
+    "contains": "import pickle",
+    "severity": "error",
+    "tags": ["security"]
+  },
+  {
+    "name": "hardcoded_paths",
+    "description": "Hardcoded file paths detected — use environment variables or config files",
+    "regex": "[\"'][/\\\\].*[/\\\\].*[\"']",
+    "severity": "warning",
+    "tags": ["portability", "config"]
+  },
+  {
+    "name": "missing_model_eval",
+    "description": "Missing model.eval() during validation/testing — can cause incorrect results",
+    "pattern": "def.*valid|def.*test|def.*eval",
+    "not_contains": ["model.eval()", ".eval()"],
+    "severity": "warning",
+    "tags": ["ml", "validation"]
+  },
+  {
+    "name": "cuda_without_cleanup",
+    "description": "CUDA usage without memory cleanup — add torch.cuda.empty_cache()",
+    "pattern": ".cuda()",
+    "not_contains": ["torch.cuda.empty_cache", "empty_cache()"],
+    "severity": "info",
+    "tags": ["gpu", "memory"]
+  },
+  {
+    "name": "missing_env_reset",
+    "description": "RL environment loop missing env.reset() — can cause state pollution",
+    "pattern": "for.*episode|while.*episode",
+    "not_contains": ["env.reset()", ".reset()"],
+    "severity": "error",
+    "tags": ["rl", "environment"]
+  },
+  {
+    "name": "no_gradient_context",
+    "description": "Inference code missing torch.no_grad() context — wastes memory",
+    "pattern": "def.*infer|def.*predict|def.*eval",
+    "not_contains": ["torch.no_grad", "no_grad()"],
+    "severity": "warning",
+    "tags": ["ml", "inference"]
+  },
+  {
+    "name": "model_save_full",
+    "description": "Saving entire model instead of state_dict — less portable and larger files",
+    "regex": "torch\\.save\\s*\\(\\s*model\\s*,",
+    "severity": "info",
+    "tags": ["ml", "serialization"]
+  },
+  {
+    "name": "data_leakage_fit_test",
+    "description": "Potential data leakage — fitting on test data detected",
+    "regex": "\\.fit\\s*\\(.*test|\\.fit\\s*\\(.*Test",
+    "severity": "error",
+    "tags": ["ml", "data_leakage"]
+  },
+  {
+    "name": "missing_exception_handling",
+    "description": "Training loop without exception handling — crashes can lose progress",
+    "pattern": "for.*epoch|while.*epoch",
+    "not_contains": ["try:", "except"],
+    "severity": "warning",
+    "tags": ["robustness", "training"]
+  },
+  {
+    "name": "global_variables",
+    "description": "Global variables detected — can cause issues in ML pipelines",
+    "regex": "^\\s*[A-Z_][A-Z0-9_]*\\s*=",
+    "severity": "warning",
+    "tags": ["best_practice", "globals"]
+  },
+  {
+    "name": "tensorboard_not_closed",
+    "description": "TensorBoard writer not properly closed — can cause resource leaks",
+    "pattern": "SummaryWriter",
+    "not_contains": ["writer.close()", ".close()"],
+    "severity": "info",
+    "tags": ["logging", "resources"]
+  },
+  {
+    "name": "deprecated_torch_api",
+    "description": "Using deprecated PyTorch API — update to current version",
+    "regex": "torch\\..*Variable|torch\\..*volatile",
+    "severity": "warning",
+    "tags": ["deprecated", "pytorch"]
+  }
+]

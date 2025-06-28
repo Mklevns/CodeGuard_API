@@ -11,6 +11,7 @@ import difflib
 from typing import List, Dict, Tuple, Optional
 from models import AuditRequest, AuditResponse, Issue, Fix
 from rule_engine import MLRLRuleEngine
+from rule_loader import CustomRuleEngine
 
 
 class EnhancedAuditEngine:
@@ -18,13 +19,15 @@ class EnhancedAuditEngine:
     
     def __init__(self):
         self.ml_rl_engine = MLRLRuleEngine()
+        self.custom_rule_engine = CustomRuleEngine()
         self.tools = {
             'flake8': self._run_flake8,
             'pylint': self._run_pylint,
             'mypy': self._run_mypy,
             'black': self._run_black,
             'isort': self._run_isort,
-            'ml_rules': self._run_ml_rules
+            'ml_rules': self._run_ml_rules,
+            'custom_rules': self._run_custom_rules
         }
     
     def analyze_code(self, request: AuditRequest) -> AuditResponse:
@@ -520,6 +523,10 @@ class EnhancedAuditEngine:
     def _run_ml_rules(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
         """Run ML/RL-specific rule analysis."""
         return self.ml_rl_engine.analyze_file(original_filename, content)
+    
+    def _run_custom_rules(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
+        """Run custom rules loaded from external rule files."""
+        return self.custom_rule_engine.analyze_file(original_filename, content)
     
     def _categorize_flake8_issue(self, code: str) -> str:
         """Categorizes flake8 error codes into issue types."""
