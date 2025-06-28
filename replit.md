@@ -163,6 +163,10 @@ Preferred communication style: Simple, everyday language.
 - Enterprise deployment successfully tested: 35 issues detected across 7 active tools with 6 security violations
 - Final validation: 8 auto-fixable suggestions out of 23 total fixes, comprehensive telemetry operational
 - Complete feature set: Historical timelines, natural language queries, intelligent explanations, trend analysis
+- **VS Code Extension**: Comprehensive TypeScript extension providing real-time linting integration
+- Extension features: Inline diagnostics, quick-fix suggestions, secure API key storage, framework detection
+- Full IDE integration with context menus, progress indicators, and auto-analysis on save
+- Supports project-level configuration via .codeguardrc.json files
 
 ## Deployment Status
 

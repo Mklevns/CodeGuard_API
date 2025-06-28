@@ -1,0 +1,177 @@
+🔌 CodeGuard VS Code Extension Specification
+🧭 Overview
+Goal: Create a Visual Studio Code extension that audits Python ML/RL code using the CodeGuard API, surfacing issues, fix suggestions, and framework insights directly in the editor.
+
+Key Features:
+
+Real-time linting using CodeGuard’s 8-tool engine
+
+Supports multi-file audits with API-powered results
+
+Inline diagnostics with quick-fix suggestions
+
+Detects and tags frameworks (e.g. PyTorch, TensorFlow)
+
+Supports custom rule packs via project config
+
+Auth via secure API key
+
+📦 Extension Metadata
+json
+Copy
+Edit
+{
+  "name": "codeguard",
+  "displayName": "CodeGuard ML/RL Auditor",
+  "description": "Enterprise-grade static analysis for ML/RL Python code with integrated framework detection, custom rules, and inline fix suggestions.",
+  "version": "0.1.0",
+  "publisher": "codeguard-ai",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Linters", "AI", "Machine Learning"],
+  "activationEvents": ["onLanguage:python", "onCommand:codeguard.runAudit"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeguard.runAudit",
+        "title": "CodeGuard: Run Audit"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "CodeGuard Configuration",
+      "properties": {
+        "codeguard.apiKey": {
+          "type": "string",
+          "description": "Your CodeGuard API key for secure access.",
+          "default": ""
+        },
+        "codeguard.serverUrl": {
+          "type": "string",
+          "default": "https://codeguard-api.run.app",
+          "description": "The base URL of your CodeGuard backend."
+        },
+        "codeguard.auditOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically run audit on file save."
+        }
+      }
+    }
+  }
+}
+🔑 Configuration
+settings.json
+json
+Copy
+Edit
+{
+  "codeguard.apiKey": "PYFIldP3...",       // User-provided secure API key
+  "codeguard.serverUrl": "https://codeguard-api.run.app",
+  "codeguard.auditOnSave": true
+}
+Stored securely using VS Code’s secret storage API.
+
+🧠 Core Workflow
+1. Trigger Audit
+Via:
+
+Manual command: CodeGuard: Run Audit
+
+Automatically on file save (.py files)
+
+2. Prepare Request
+The extension packages:
+
+json
+Copy
+Edit
+{
+  "files": [
+    {
+      "filename": "train.py",
+      "content": "...file contents..."
+    }
+  ],
+  "options": {
+    "level": "strict",
+    "framework": "auto",
+    "target": "gpu"
+  }
+}
+3. Send to API
+http
+Copy
+Edit
+POST https://codeguard-api.run.app/audit
+Authorization: Bearer {user_api_key}
+Content-Type: application/json
+4. Render Results in VS Code
+For each issue:
+
+Highlight line
+
+Display diagnostic (type, description)
+
+Provide quick-fix suggestion if available
+
+Example:
+
+ts
+Copy
+Edit
+vscode.languages.createDiagnosticCollection('codeguard')
+🎛 Optional Features
+Feature	Description
+codeguard.ignoreRules	User-defined list of rule IDs to skip
+.codeguardrc.json	Project-level config file
+codeguard.generateReport()	Command to export Markdown or JSON report
+codeguard.compareRuns()	View diff of latest two audit runs
+Rule Source Link	Link to docs for each rule triggered
+
+📁 Project Structure
+pgsql
+Copy
+Edit
+codeguard-vscode/
+├── src/
+│   └── extension.ts      # Main entry point
+│   └── api.ts            # Handles requests to CodeGuard backend
+│   └── diagnostics.ts    # Maps issues to VS Code diagnostics
+│   └── config.ts         # Handles settings and secure storage
+├── out/                  # Compiled JS
+├── package.json          # Extension manifest
+├── tsconfig.json         # TypeScript config
+🧪 Example Issue Rendering
+plaintext
+Copy
+Edit
+[🔶 warning] [no_logging] Use `logging` instead of `print()` (line 42)
+Suggested Fix: Replace `print(...)` with `logging.info(...)`
+Hovering on the squiggly line shows full description and fix.
+
+🧰 Dependencies
+Node.js + TypeScript
+
+axios (for HTTP requests)
+
+vscode-languageclient (for diagnostics)
+
+jsdiff (optional for rendering diffs)
+
+fs-extra, path, os for file ops
+
+🚀 Publish & Distribution
+Register with VS Code Marketplace (or publish privately)
+
+Build with:
+
+bash
+Copy
+Edit
+npm install && npm run compile
+vsce package
+vsce publish
+Include .vsix installer for offline orgs
