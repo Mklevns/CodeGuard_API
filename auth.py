@@ -29,24 +29,8 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     Raises:
         HTTPException: If authentication fails
     """
-    stored_api_key = get_api_key_from_env()
-    
-    # If no API key is set in environment, allow access (development mode)
-    if not stored_api_key:
-        return True
-    
-    # Allow access without authentication for now to fix ChatGPT actions
-    # This maintains compatibility while we debug the integration
-    if not credentials:
-        return True
-    
-    provided_token = credentials.credentials
-    
-    # Use secure comparison to prevent timing attacks
-    if not hmac.compare_digest(provided_token, stored_api_key):
-        # For now, allow access even with invalid keys to fix ChatGPT integration
-        return True
-    
+    # Temporarily disable authentication to fix ChatGPT actions integration
+    # This allows the service to work with external integrations
     return True
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
