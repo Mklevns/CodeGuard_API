@@ -113,7 +113,7 @@ Preferred communication style: Simple, everyday language.
 ## Deployment Status
 
 **Current Status**: ✓ Live and operational
-**Production HTTPS URL**: https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev
+**Production HTTPS URL**: https://CodeGuard.replit.app
 **Key Endpoints**:
 - `/audit` - Main code analysis endpoint (POST) - Requires API key
 - `/auth/status` - Authentication verification endpoint 
