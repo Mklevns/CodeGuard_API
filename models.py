@@ -44,12 +44,17 @@ class Issue(BaseModel):
     line: int = Field(description="Line number of the issue")
     type: str = Field(description="Type of issue", examples=["style"])
     description: str = Field(description="Description of the issue")
+    source: str = Field(description="Analysis tool that detected the issue", examples=["flake8", "pylint", "mypy", "ml_rules"])
+    severity: str = Field(description="Issue severity level", examples=["error", "warning", "info"], default="warning")
 
 class Fix(BaseModel):
     """Represents a suggested fix for an issue."""
     filename: str = Field(description="File where the fix should be applied")
     line: int = Field(description="Line number for the fix")
     suggestion: str = Field(description="Suggested fix")
+    diff: Optional[str] = Field(description="Unified diff showing the change", default=None)
+    replacement_code: Optional[str] = Field(description="Complete replacement code for the line/block", default=None)
+    auto_fixable: bool = Field(description="Whether this fix can be applied automatically", default=False)
 
 class AuditResponse(BaseModel):
     """Response model for the audit endpoint."""

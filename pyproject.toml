@@ -4,8 +4,13 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
+    "black>=25.1.0",
     "fastapi>=0.115.14",
     "flake8>=7.3.0",
+    "isort>=6.0.1",
+    "libcst>=1.8.2",
+    "mypy>=1.16.1",
     "pydantic>=2.11.7",
+    "pylint>=3.3.7",
     "uvicorn>=0.34.3",
 ]

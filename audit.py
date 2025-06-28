@@ -4,60 +4,21 @@ import os
 import re
 from typing import List, Dict, Tuple
 from models import AuditRequest, AuditResponse, Issue, Fix
+from enhanced_audit import EnhancedAuditEngine
 
 def analyze_code(request: AuditRequest) -> AuditResponse:
     """
-    Analyzes Python code files using flake8 and returns structured results.
+    Analyzes Python code files using multiple static analysis tools and ML/RL rules.
     
     Args:
         request: AuditRequest containing files to analyze
         
     Returns:
-        AuditResponse with analysis results
+        AuditResponse with analysis results from multiple tools
     """
-    issues = []
-    fixes = []
-    
-    # Create a temporary directory for analysis
-    with tempfile.TemporaryDirectory() as temp_dir:
-        file_paths = []
-        
-        # Write files to temporary directory
-        for file in request.files:
-            # Sanitize filename to prevent path traversal
-            safe_filename = os.path.basename(file.filename)
-            if not safe_filename.endswith('.py'):
-                safe_filename += '.py'
-                
-            file_path = os.path.join(temp_dir, safe_filename)
-            file_paths.append((file_path, file.filename))
-            
-            try:
-                with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(file.content)
-            except Exception as e:
-                issues.append(Issue(
-                    filename=file.filename,
-                    line=1,
-                    type="error",
-                    description=f"Failed to write file for analysis: {str(e)}"
-                ))
-                continue
-        
-        # Run flake8 analysis on all files
-        for file_path, original_filename in file_paths:
-            file_issues, file_fixes = _analyze_single_file(file_path, original_filename)
-            issues.extend(file_issues)
-            fixes.extend(file_fixes)
-    
-    # Generate summary
-    summary = f"{len(issues)} issues found across {len(request.files)} files"
-    
-    return AuditResponse(
-        summary=summary,
-        issues=issues,
-        fixes=fixes
-    )
+    # Use the enhanced audit engine for comprehensive analysis
+    enhanced_engine = EnhancedAuditEngine()
+    return enhanced_engine.analyze_code(request)
 
 def _analyze_single_file(file_path: str, original_filename: str) -> Tuple[List[Issue], List[Fix]]:
     """
