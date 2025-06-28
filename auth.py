@@ -29,18 +29,19 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     Raises:
         HTTPException: If authentication fails
     """
+    stored_api_key = get_api_key_from_env()
+    
+    # If no API key is set in environment, allow access (development mode)
+    if not stored_api_key:
+        return True
+    
+    # In production mode, require credentials
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing API key",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    stored_api_key = get_api_key_from_env()
-    
-    if not stored_api_key:
-        # If no API key is set in environment, allow access (development mode)
-        return True
     
     provided_token = credentials.credentials
     
@@ -66,7 +67,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     """
     verify_api_key(credentials)
     
+    stored_api_key = get_api_key_from_env()
+    
     return {
         "authenticated": True,
-        "api_key_hash": hash_api_key(credentials.credentials)[:8]  # First 8 chars for logging
+        "mode": "development" if not stored_api_key else "production",
+        "api_key_hash": hash_api_key(credentials.credentials)[:8] if credentials and credentials.credentials else "dev-mode"
     }
