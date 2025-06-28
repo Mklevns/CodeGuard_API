@@ -99,6 +99,27 @@
           "enum": ["basic", "standard", "strict"],
           "default": "standard",
           "description": "Analysis strictness level."
+        },
+        "codeguard.aiProvider": {
+          "type": "string",
+          "enum": ["openai", "gemini", "claude"],
+          "description": "AI provider for code improvements and fixes.",
+          "default": "openai"
+        },
+        "codeguard.openaiApiKey": {
+          "type": "string",
+          "description": "Your OpenAI API key for ChatGPT integration.",
+          "default": ""
+        },
+        "codeguard.geminiApiKey": {
+          "type": "string",
+          "description": "Your Google Gemini API key for AI improvements.",
+          "default": ""
+        },
+        "codeguard.claudeApiKey": {
+          "type": "string",
+          "description": "Your Anthropic Claude API key for AI assistance.",
+          "default": ""
         }
       }
     }

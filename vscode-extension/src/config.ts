@@ -75,4 +75,38 @@ export class ConfigManager {
             vscode.window.showInformationMessage('CodeGuard API key saved securely');
         }
     }
+    
+    getAiProvider(): string {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get<string>('aiProvider') || 'openai';
+    }
+    
+    async getOpenAiApiKey(): Promise<string | undefined> {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get<string>('openaiApiKey');
+    }
+    
+    async getGeminiApiKey(): Promise<string | undefined> {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get<string>('geminiApiKey');
+    }
+    
+    async getClaudeApiKey(): Promise<string | undefined> {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get<string>('claudeApiKey');
+    }
+    
+    async getCurrentAiApiKey(): Promise<string | undefined> {
+        const provider = this.getAiProvider();
+        switch (provider) {
+            case 'openai':
+                return this.getOpenAiApiKey();
+            case 'gemini':
+                return this.getGeminiApiKey();
+            case 'claude':
+                return this.getClaudeApiKey();
+            default:
+                return this.getOpenAiApiKey();
+        }
+    }
 }
