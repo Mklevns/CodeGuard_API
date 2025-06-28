@@ -94,9 +94,10 @@ Preferred communication style: Simple, everyday language.
 ## Deployment Status
 
 **Current Status**: ✓ Live and operational
-**Public URL**: http://34.55.167.13:5000
+**Production HTTPS URL**: https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev
 **Key Endpoints**:
-- `/audit` - Main code analysis endpoint (POST)
+- `/audit` - Main code analysis endpoint (POST) - Requires API key
+- `/auth/status` - Authentication verification endpoint 
 - `/docs` - Interactive API documentation 
 - `/health` - Service health check
 - `/.well-known/openapi.yaml` - OpenAPI spec for GPT Actions

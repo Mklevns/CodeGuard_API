@@ -1,8 +1,16 @@
-# CodeGuard API - Authentication Guide
+# CodeGuard API - Complete Usage Guide
+
+## Overview
+
+CodeGuard API is a FastAPI-based service that analyzes Python code for ML/RL projects, providing structured reports of issues and fix suggestions. The API includes secure authentication and is fully compatible with OpenAI GPT Actions.
+
+## HTTPS Endpoint
+
+**Production URL**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev`
 
 ## API Key Authentication
 
-The CodeGuard API now includes secure API key authentication to protect the code analysis service.
+The CodeGuard API includes secure API key authentication to protect the code analysis service.
 
 ### How Authentication Works
 
@@ -23,7 +31,7 @@ export CODEGUARD_API_KEY="your-secure-api-key-here"
 Include your API key in the Authorization header:
 
 ```bash
-curl -X POST "http://34.55.167.13:5000/audit" \
+curl -X POST "https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/audit" \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer your-api-key" \
      -d '{
@@ -41,7 +49,7 @@ curl -X POST "http://34.55.167.13:5000/audit" \
 Verify your API key is working:
 
 ```bash
-curl -X GET "http://34.55.167.13:5000/auth/status" \
+curl -X GET "https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/auth/status" \
      -H "Authorization: Bearer your-api-key"
 ```
 
@@ -56,6 +64,13 @@ curl -X GET "http://34.55.167.13:5000/auth/status" \
 - `GET /health` - Health check
 - `GET /.well-known/openapi.yaml` - API specification
 - `GET /docs` - Interactive documentation
+
+### Quick Test URLs
+
+- **API Homepage**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/`
+- **Interactive Docs**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/docs`
+- **Health Check**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/health`
+- **OpenAPI Spec**: `https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev/.well-known/openapi.yaml`
 
 ### Error Responses
 
