@@ -1,0 +1,47 @@
+[
+  {
+    "name": "inefficient_loop",
+    "description": "Using += for string concatenation in loop — use join() instead",
+    "regex": "for.*:\\s*\\n.*\\+=.*str",
+    "severity": "warning",
+    "tags": ["performance", "strings"]
+  },
+  {
+    "name": "list_comprehension_opportunity",
+    "description": "Loop can be replaced with list comprehension for better performance",
+    "pattern": "for.*in.*:\n.*append(",
+    "severity": "info",
+    "tags": ["performance", "pythonic"]
+  },
+  {
+    "name": "numpy_loop",
+    "description": "Using Python loop on NumPy arrays — use vectorized operations",
+    "pattern": "import numpy",
+    "regex": "for.*np\\.|for.*numpy\\.",
+    "severity": "warning",
+    "tags": ["performance", "numpy", "vectorization"]
+  },
+  {
+    "name": "redundant_computation",
+    "description": "Computation inside loop that could be moved outside",
+    "regex": "for.*:\\s*\\n.*len\\(|for.*:\\s*\\n.*range\\(len\\(",
+    "severity": "info",
+    "tags": ["performance", "optimization"]
+  },
+  {
+    "name": "inefficient_dict_access",
+    "description": "Using dict.keys() for membership testing — use 'in dict' instead",
+    "regex": "in.*\\.keys\\(\\)",
+    "severity": "info",
+    "tags": ["performance", "dict"]
+  },
+  {
+    "name": "memory_leak_tensor",
+    "description": "Creating tensors in loop without detaching — potential memory leak",
+    "pattern": "for.*:",
+    "regex": "torch\\..*\\(",
+    "not_contains": [".detach()", ".cpu()"],
+    "severity": "warning",
+    "tags": ["performance", "memory", "pytorch"]
+  }
+]

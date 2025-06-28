@@ -1,0 +1,52 @@
+[
+  {
+    "name": "eval_usage",
+    "description": "Using eval() function — dangerous for code injection attacks",
+    "regex": "\\beval\\s*\\(",
+    "severity": "error",
+    "tags": ["security", "injection"]
+  },
+  {
+    "name": "exec_usage",
+    "description": "Using exec() function — can execute arbitrary code",
+    "regex": "\\bexec\\s*\\(",
+    "severity": "error",
+    "tags": ["security", "injection"]
+  },
+  {
+    "name": "shell_injection",
+    "description": "Potential shell injection via os.system or subprocess with shell=True",
+    "regex": "os\\.system\\(|subprocess.*shell\\s*=\\s*True",
+    "severity": "error",
+    "tags": ["security", "shell_injection"]
+  },
+  {
+    "name": "sql_injection_risk",
+    "description": "Potential SQL injection — use parameterized queries instead",
+    "regex": "execute\\s*\\(.*%.*\\)|execute\\s*\\(.*\\+.*\\)",
+    "severity": "error",
+    "tags": ["security", "sql_injection"]
+  },
+  {
+    "name": "hardcoded_secrets",
+    "description": "Hardcoded secrets detected — use environment variables",
+    "regex": "(password|secret|key|token)\\s*=\\s*[\"'][^\"']{8,}[\"']",
+    "severity": "error",
+    "tags": ["security", "secrets"]
+  },
+  {
+    "name": "unsafe_yaml_load",
+    "description": "Using unsafe yaml.load() — use yaml.safe_load() instead",
+    "regex": "yaml\\.load\\s*\\(",
+    "severity": "warning",
+    "tags": ["security", "deserialization"]
+  },
+  {
+    "name": "insecure_random",
+    "description": "Using insecure random module for cryptographic purposes",
+    "pattern": "import random",
+    "contains": "random.random",
+    "severity": "warning",
+    "tags": ["security", "cryptography"]
+  }
+]
