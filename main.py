@@ -114,8 +114,15 @@ async def terms_of_service():
 
 if __name__ == "__main__":
     # Run the application - optimized for both development and Cloud Run
-    port = int(os.environ.get("PORT", 5000))
     environment = os.environ.get("ENVIRONMENT", "development")
+    
+    # Set appropriate default port based on environment
+    if environment == "production":
+        default_port = 8080  # Cloud Run standard port
+    else:
+        default_port = 5000  # Replit development port
+    
+    port = int(os.environ.get("PORT", default_port))
     
     print(f"Starting CodeGuard API on 0.0.0.0:{port} (environment: {environment})")
     

@@ -1,6 +1,9 @@
 #!/bin/bash
 # Startup script for CodeGuard API - handles both local and Cloud Run environments
 
+# Set environment to production for Cloud Run deployment
+export ENVIRONMENT=production
+
 # Set default port if not provided
 if [ -z "$PORT" ]; then
     export PORT=8080
@@ -10,7 +13,7 @@ fi
 which curl > /dev/null || (apt-get update && apt-get install -y curl)
 
 echo "Starting CodeGuard API on port $PORT"
-echo "Environment: ${ENVIRONMENT:-production}"
+echo "Environment: ${ENVIRONMENT}"
 
 # Start the application
 exec python run.py
