@@ -1,8 +1,8 @@
 {
   "name": "codeguard",
   "displayName": "CodeGuard ML/RL Auditor",
-  "description": "Enterprise-grade static analysis for ML/RL Python code with integrated framework detection, custom rules, and inline fix suggestions.",
-  "version": "0.1.0",
+  "description": "Enterprise-grade static analysis for ML/RL Python code with AI-powered improvements, framework detection, custom rules, and intelligent fix suggestions.",
+  "version": "0.2.0",
   "publisher": "codeguard-ai",
   "repository": {
     "type": "git",
