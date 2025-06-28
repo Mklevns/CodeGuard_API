@@ -8,7 +8,7 @@ info:
   license:
     name: MIT
 servers:
-  - url: https://87ee31f3-2ea8-47fa-bfc6-dab95a535424-00-2j7aj3sdppcjx.riker.replit.dev
+  - url: https://CodeGuard.replit.app
     description: Production HTTPS endpoint
   - url: http://localhost:5000
     description: Local development server
