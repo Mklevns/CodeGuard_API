@@ -14,7 +14,7 @@ class MultiAIManager:
     """Simplified multi-AI manager with timeout optimization"""
     
     def __init__(self):
-        self.chatgpt_improver = ChatGPTCodeImprover()
+        self.multi_llm_improver = MultiLLMCodeImprover()
     
     async def improve_code_with_provider(
         self, 
@@ -24,12 +24,13 @@ class MultiAIManager:
     ) -> CodeImprovementResponse:
         """Improve code using specified AI provider with async optimization"""
         
-        # Use OpenAI implementation with custom API key if provided
-        if provider_name == "openai" or not provider_name:
-            return await self._improve_with_openai_async(request, api_key)
-        
-        # Fallback for other providers
-        return self._fallback_improvement(request, provider_name)
+        # Set provider and API key in request
+        request.ai_provider = provider_name or "openai"
+        if api_key:
+            request.ai_api_key = api_key
+            
+        # Use multi-LLM improver with provider routing
+        return self.multi_llm_improver.improve_code(request)
     
     async def _improve_with_openai_async(self, request: CodeImprovementRequest, api_key: Optional[str]) -> CodeImprovementResponse:
         """Async OpenAI improvement with timeout optimization"""
