@@ -350,34 +350,42 @@ class MultiLLMCodeImprover:
             "model": "deepseek-chat",
             "messages": messages,
             "response_format": {"type": "json_object"},
-            "max_tokens": 8000
+            "max_tokens": 8000,
+            "stream": False  # Explicitly disable streaming to avoid keep-alive issues
         }
         
         try:
             response = requests.post(url, headers=headers, json=data, timeout=30)
             response.raise_for_status()
             
-            # Handle DeepSeek's keep-alive responses
-            response_text = response.text.strip()
+            # Parse the standard OpenAI-compatible response format
+            response_data = response.json()
             
-            # Filter out empty lines and keep-alive messages
-            lines = [line.strip() for line in response_text.split('\n') if line.strip()]
-            if not lines:
-                raise Exception("DeepSeek API returned only keep-alive messages")
+            if "choices" not in response_data or not response_data["choices"]:
+                raise Exception("DeepSeek API returned empty response")
             
-            # Parse the actual JSON response (last non-empty line)
-            json_response = None
-            for line in reversed(lines):
-                try:
-                    json_response = json.loads(line)
-                    break
-                except json.JSONDecodeError:
-                    continue
+            # Extract the message content
+            message_content = response_data["choices"][0]["message"]["content"]
             
-            if not json_response:
-                raise Exception("No valid JSON response found in DeepSeek API response")
+            if not message_content:
+                raise Exception("DeepSeek API returned empty message content")
+                
+            return message_content
             
-            return json_response["choices"][0]["message"]["content"]
+        except requests.exceptions.Timeout:
+            raise Exception("DeepSeek function calling timed out - please try again")
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"DeepSeek API request failed: {str(e)}")
+        except (json.JSONDecodeError, KeyError) as e:
+            # Fallback: try to parse response text directly
+            try:
+                response_text = response.text.strip()
+                if response_text:
+                    return response_text
+                else:
+                    raise Exception("DeepSeek API returned empty response")
+            except Exception:
+                raise Exception(f"Failed to parse DeepSeek response: {str(e)}")
             
         except Exception as e:
             return json.dumps({
