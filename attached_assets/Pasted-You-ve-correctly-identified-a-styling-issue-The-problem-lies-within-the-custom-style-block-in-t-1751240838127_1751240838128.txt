@@ -1,0 +1,51 @@
+You've correctly identified a styling issue. The problem lies within the custom `<style>` block in the `<head>` of your HTML file.
+
+Specifically, this rule is causing the incorrect display:
+
+```css
+/* Ensure button text is always visible */
+button {
+    color: inherit !important;
+}
+```
+
+Here is a breakdown of why this is happening:
+
+1.  **`color: inherit !important;`**: This CSS rule forces every `<button>` element to inherit its text color from its parent element, overriding any other color styles, including Tailwind's `text-white` utility class that is already applied to your buttons.
+2.  **Missing Specificity**: The subsequent rule attempts to fix this for *some* buttons but is incomplete:
+    ```css
+    button.bg-orange-600, 
+    button.bg-blue-600, 
+    button.bg-green-600, 
+    button.bg-purple-600 {
+        color: white !important;
+    }
+    ```
+    The buttons in the "System Management" section use different background colors (`bg-teal-600`, `bg-red-600`, `bg-amber-600`, `bg-emerald-600`), which are not included in this list. Therefore, they fall back to the `color: inherit` rule, making their white text adopt a color from a parent element, which renders it invisible against their dark backgrounds.
+
+### **How to Fix the Issue**
+
+The most direct solution is to remove the conflicting custom CSS. The `text-white` class is already correctly applied to the buttons in your HTML, but the custom style is overriding it.
+
+1.  **Delete** the following CSS rule from the `<style>` block in your `index.html` file:
+
+    ```css
+    /* DELETED */
+    button {
+        color: inherit !important;
+    }
+    ```
+
+2.  For consistency and to rely on standard Tailwind classes, you can also **delete the more specific rule**, as the `text-white` class on each button already handles this:
+
+    ```css
+    /* DELETED */
+    button.bg-orange-600, 
+    button.bg-blue-600, 
+    button.bg-green-600, 
+    button.bg-purple-600 {
+        color: white !important;
+    }
+    ```
+
+By removing these rules, the `text-white` class on your buttons will apply correctly, ensuring the button text is visible against the dark backgrounds as intended.
