@@ -690,20 +690,21 @@ CRITICAL: The improved_code must be the entire corrected file, ready to replace 
 """
         
         try:
+            # Try DeepSeek with shorter timeout
             response_text = self._call_deepseek_r1(prompt, request.ai_api_key)
             
             # Parse DeepSeek response - should be clean JSON with response_format
             try:
                 result = json.loads(response_text)
+                
+                # Validate that we got improved code
+                if not result.get("improved_code") or result.get("improved_code") == request.original_code:
+                    # If no improvement, apply basic fixes ourselves
+                    result = self._apply_basic_fixes_fallback(request, confidence_boost)
+                    
             except (json.JSONDecodeError, AttributeError, TypeError) as e:
-                # If JSON parsing fails, create structured response
-                result = {
-                    "improved_code": request.original_code,
-                    "applied_fixes": [],
-                    "improvement_summary": f"DeepSeek Function Calling completed with analysis insights",
-                    "confidence_score": 0.8,
-                    "warnings": ["Enhanced analysis completed via function calling"]
-                }
+                # If JSON parsing fails, apply basic fixes
+                result = self._apply_basic_fixes_fallback(request, confidence_boost)
             
             # Apply confidence boost from custom prompt
             base_confidence = float(result.get("confidence_score", 0.8))
