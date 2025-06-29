@@ -35,6 +35,16 @@
         .tab-btn {
             @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300;
         }
+        /* Ensure button text is always visible */
+        button {
+            color: inherit !important;
+        }
+        button.bg-orange-600, 
+        button.bg-blue-600, 
+        button.bg-green-600, 
+        button.bg-purple-600 {
+            color: white !important;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -112,7 +122,7 @@
                         <button id="auditImproveBtn" class="flex-1 bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 font-medium">
                             🚀 Audit + Improve
                         </button>
-                        <button id="fimBtn" class="flex-1 bg-orange-600 text-white px-6 py-3 rounded-md hover:bg-orange-700 font-medium">
+                        <button id="fimBtn" class="flex-1 bg-orange-600 text-white px-6 py-3 rounded-md hover:bg-orange-700 font-medium" style="color: white !important;">
                             🎯 FIM Complete
                         </button>
                     </div>
