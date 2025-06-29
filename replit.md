@@ -259,6 +259,11 @@ Preferred communication style: Simple, everyday language.
 - Corrected script path in HTML from "playground.js" to "/static/playground.js" to resolve 404 errors
 - All playground buttons now functional with proper event listener initialization
 - Fixed prevents JavaScript runtime errors and enables full playground functionality
+- **June 29, 2025**: Fixed DeepSeek API integration for code improvement
+- Updated DeepSeek integration to use "deepseek-chat" model with JSON output format
+- Added proper response_format parameter {'type': 'json_object'} for reliable JSON responses
+- Enhanced error handling for empty responses and JSON parsing failures
+- DeepSeek AI provider now works reliably for code improvement suggestions in playground
 
 ## Deployment Status
 

@@ -67,14 +67,21 @@ class MultiLLMCodeImprover:
         }
         
         data = {
-            "model": "deepseek-reasoner",
+            "model": "deepseek-chat",  # Use deepseek-chat for JSON output support
             "messages": [
+                {
+                    "role": "system",
+                    "content": "You are an expert Python developer. Always respond with valid JSON format containing the requested fields."
+                },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            "max_tokens": 8000  # Increased for reasoning model
+            "response_format": {
+                "type": "json_object"
+            },
+            "max_tokens": 8000
         }
         
         try:
@@ -84,15 +91,14 @@ class MultiLLMCodeImprover:
             result = response.json()
             message = result["choices"][0]["message"]
             
-            # DeepSeek reasoner provides both reasoning_content and content
-            reasoning_content = message.get("reasoning_content", "")
-            final_content = message.get("content", "")
+            # DeepSeek chat returns structured content
+            content = message.get("content", "")
             
-            # Return the final answer, optionally log reasoning for debugging
-            if reasoning_content and len(reasoning_content) > 100:
-                print(f"DeepSeek reasoning: {reasoning_content[:200]}...")
+            # Ensure we return a string, not None
+            if not content:
+                raise Exception("DeepSeek API returned empty response")
             
-            return final_content or reasoning_content
+            return content
             
         except requests.exceptions.Timeout:
             raise Exception("DeepSeek reasoner is thinking deeply about your code - this may take longer than expected")
@@ -181,23 +187,18 @@ class MultiLLMCodeImprover:
         
         response_text = self._call_deepseek_r1(prompt, request.ai_api_key)
         
-        # Parse DeepSeek response
+        # Parse DeepSeek response - should be clean JSON with response_format
         try:
-            # Extract JSON from response if it contains additional text
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                result = json.loads(json_match.group())
-            else:
-                # Fallback: try to parse entire response as JSON
-                result = json.loads(response_text)
-        except json.JSONDecodeError:
+            # DeepSeek with JSON output should return clean JSON
+            result = json.loads(response_text)
+        except (json.JSONDecodeError, AttributeError, TypeError) as e:
             # If JSON parsing fails, create structured response
             result = {
                 "improved_code": request.original_code,
                 "applied_fixes": [],
-                "improvement_summary": "DeepSeek R1 provided text response but JSON parsing failed",
+                "improvement_summary": f"DeepSeek JSON parsing failed: {str(e)}. Response: {str(response_text)[:200]}...",
                 "confidence_score": 0.3,
-                "warnings": ["Response format parsing issue"]
+                "warnings": ["DeepSeek returned invalid JSON format"]
             }
         
         return CodeImprovementResponse(
