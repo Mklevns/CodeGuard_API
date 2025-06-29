@@ -326,6 +326,7 @@ Preferred communication style: Simple, everyday language.
 - `/templates/preview` - Preview project structure before creation
 - `/improve/code` - AI-powered single file code improvement
 - `/improve/project` - AI-powered multi-file project improvement
+- `/improve/fim-completion` - DeepSeek FIM (Fill In the Middle) completion for targeted code improvements
 - `/audit-and-improve` - Combined audit and AI improvement in one call
 - `/docs` - Interactive API documentation 
 - `/health` - Service health check
