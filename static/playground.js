@@ -90,6 +90,12 @@ class CodeGuardPlayground {
         document.getElementById('downloadImproved').addEventListener('click', () => this.downloadImprovedCode());
         document.getElementById('exportMarkdown').addEventListener('click', () => this.exportReport('markdown'));
         document.getElementById('exportHtml').addEventListener('click', () => this.exportReport('html'));
+        
+        // Enhancement buttons
+        document.getElementById('cacheStatsBtn').addEventListener('click', () => this.showCacheStats());
+        document.getElementById('clearCacheBtn').addEventListener('click', () => this.clearCache());
+        document.getElementById('ruleConfigBtn').addEventListener('click', () => this.showRuleConfig());
+        document.getElementById('systemHealthBtn').addEventListener('click', () => this.showSystemHealth());
     }
 
     loadExampleCode() {
