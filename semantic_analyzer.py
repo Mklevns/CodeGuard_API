@@ -165,22 +165,43 @@ class SemanticVisitor(ast.NodeVisitor):
                 self._flag_missing_seed(node, 'random')
         
         # Check for module-level random calls  
-        elif isinstance(node.func, ast.Attribute):
+        if isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
                 module_name = node.func.value.id
                 method_name = node.func.attr
                 
                 # Check numpy random without seeding
-                if module_name == 'np' and method_name in ['random', 'rand', 'randn', 'randint']:
-                    numpy_seed_patterns = ['np.random.seed(', 'numpy.random.seed(']
-                    if not any(pattern in self.content for pattern in numpy_seed_patterns):
+                if module_name in ['np', 'numpy'] and method_name in ['random', 'rand', 'randn', 'randint', 'choice', 'uniform', 'normal']:
+                    if not self._has_numpy_seed_set():
                         self._flag_missing_seed(node, 'numpy')
                 
                 # Check torch random without seeding
-                elif module_name == 'torch' and method_name in ['rand', 'randn', 'randint']:
-                    torch_seed_patterns = ['torch.manual_seed(', 'torch.cuda.manual_seed(']
-                    if not any(pattern in self.content for pattern in torch_seed_patterns):
+                elif module_name == 'torch' and method_name in ['rand', 'randn', 'randint', 'normal', 'uniform']:
+                    if not self._has_torch_seed_set():
                         self._flag_missing_seed(node, 'torch')
+            
+            # Handle chained attribute calls like np.random.rand()
+            elif isinstance(node.func.value, ast.Attribute):
+                # Get the full attribute chain
+                attr_chain = self._get_attribute_chain(node.func)
+                if len(attr_chain) >= 2:
+                    if attr_chain[0] == 'np' and attr_chain[1] == 'random':
+                        if not self._has_numpy_seed_set():
+                            self._flag_missing_seed(node, 'numpy')
+    
+    def _get_attribute_chain(self, node: ast.Attribute) -> List[str]:
+        """Get the full attribute chain from an AST node (e.g., np.random.rand -> ['np', 'random', 'rand'])."""
+        chain = []
+        current = node
+        
+        while isinstance(current, ast.Attribute):
+            chain.insert(0, current.attr)
+            current = current.value
+        
+        if isinstance(current, ast.Name):
+            chain.insert(0, current.id)
+        
+        return chain
     
     def _analyze_method_call(self, node: ast.Call):
         """Analyze method calls like obj.method()."""

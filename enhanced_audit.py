@@ -47,18 +47,24 @@ class EnhancedAuditEngine:
         all_issues = []
         all_fixes = []
         
-        # Create a temporary directory for analysis
-        with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a unique temporary directory for each request to prevent race conditions
+        with tempfile.TemporaryDirectory(prefix=f"codeguard_audit_{os.getpid()}_") as temp_dir:
+            # Create a unique subdirectory for this specific audit request
+            import uuid
+            request_id = str(uuid.uuid4())[:8]
+            unique_dir = os.path.join(temp_dir, f"audit_{request_id}")
+            os.makedirs(unique_dir, exist_ok=True)
+            
             file_paths = []
             
-            # Write files to temporary directory
+            # Write files to unique temporary directory
             for file in request.files:
                 # Sanitize filename to prevent path traversal
                 safe_filename = os.path.basename(file.filename)
                 if not safe_filename.endswith('.py'):
                     safe_filename += '.py'
                     
-                file_path = os.path.join(temp_dir, safe_filename)
+                file_path = os.path.join(unique_dir, safe_filename)
                 file_paths.append((file_path, file.filename, file.content))
                 
                 try:
