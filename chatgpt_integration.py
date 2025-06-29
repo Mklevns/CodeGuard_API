@@ -158,10 +158,30 @@ class MultiLLMCodeImprover:
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=15)
+            response = requests.post(url, headers=headers, json=data, timeout=30)
             response.raise_for_status()
             
-            result = response.json()
+            # Handle DeepSeek's keep-alive responses
+            response_text = response.text.strip()
+            
+            # Filter out empty lines and keep-alive messages
+            lines = [line.strip() for line in response_text.split('\n') if line.strip()]
+            if not lines:
+                raise Exception("DeepSeek API returned only keep-alive messages")
+            
+            # Parse the actual JSON response (last non-empty line)
+            json_response = None
+            for line in reversed(lines):
+                try:
+                    json_response = json.loads(line)
+                    break
+                except json.JSONDecodeError:
+                    continue
+            
+            if not json_response:
+                raise Exception("No valid JSON response found in DeepSeek API response")
+            
+            result = json_response
             message = result["choices"][0]["message"]
             
             # Check if DeepSeek wants to call functions
@@ -334,17 +354,38 @@ class MultiLLMCodeImprover:
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=15)
+            response = requests.post(url, headers=headers, json=data, timeout=30)
             response.raise_for_status()
-            result = response.json()
-            return result["choices"][0]["message"]["content"]
+            
+            # Handle DeepSeek's keep-alive responses
+            response_text = response.text.strip()
+            
+            # Filter out empty lines and keep-alive messages
+            lines = [line.strip() for line in response_text.split('\n') if line.strip()]
+            if not lines:
+                raise Exception("DeepSeek API returned only keep-alive messages")
+            
+            # Parse the actual JSON response (last non-empty line)
+            json_response = None
+            for line in reversed(lines):
+                try:
+                    json_response = json.loads(line)
+                    break
+                except json.JSONDecodeError:
+                    continue
+            
+            if not json_response:
+                raise Exception("No valid JSON response found in DeepSeek API response")
+            
+            return json_response["choices"][0]["message"]["content"]
+            
         except Exception as e:
             return json.dumps({
                 "improved_code": "# Function calling completed",
                 "applied_fixes": [],
                 "improvement_summary": "DeepSeek function calling analysis completed with comprehensive improvements",
                 "confidence_score": 0.8,
-                "warnings": []
+                "warnings": [f"DeepSeek processing note: {str(e)}"]
             })
     
     def improve_code(self, request: CodeImprovementRequest) -> CodeImprovementResponse:

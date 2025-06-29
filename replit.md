@@ -273,6 +273,12 @@ Preferred communication style: Simple, everyday language.
 - DeepSeek now performs multi-step analysis using tools before providing final improvements
 - Enhanced prompt engineering for targeted framework detection (PyTorch, TensorFlow, OpenAI Gym)
 - Function Calling provides more comprehensive and specialized code improvements compared to basic chat responses
+- **June 29, 2025**: Enhanced DeepSeek API integration with proper keep-alive message handling
+- Fixed JavaScript playground errors by improving escapeHtml function with null/undefined safety checks
+- Updated DeepSeek API calls to handle keep-alive empty lines that prevent TCP timeout interruptions
+- Enhanced response parsing to filter out keep-alive messages and extract valid JSON responses
+- Increased timeout to 30 seconds for DeepSeek Function Calling to accommodate longer processing times
+- Improved error handling with detailed messages for better debugging and user experience
 
 ## Deployment Status
 
