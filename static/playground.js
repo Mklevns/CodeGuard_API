@@ -913,6 +913,9 @@ def evaluate_model():
                 // Fetch repository files for dropdown selection
                 await this.fetchRepositoryFiles();
                 
+                // Show Smart Context Improve button
+                this.showSmartContextButton();
+                
             } else {
                 statusEl.innerHTML = '<span class="text-red-600">✗ Analysis failed: ' + (result.error || result.detail || 'Unknown error') + '</span>';
                 repoInfoEl.classList.add('hidden');
