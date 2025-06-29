@@ -1,0 +1,93 @@
+Based on the console logs you've provided, here is a breakdown of the issues and how to fix them, starting with the most critical errors:
+
+### **Critical Errors and Fixes**
+
+#### **1. 404 Not Found Errors for API Routes**
+
+The errors `POST https://.../repo/analyze 404 (Not Found)` and `POST https://.../repo/file-content 404 (Not Found)` indicate that the frontend is trying to communicate with backend API endpoints that do not exist.
+
+  * **Fix:** You need to add these missing endpoints to your `main.py` file. Here are the required routes:
+
+    ```python
+    # Add these imports to the top of your main.py
+    from fastapi import APIRouter, HTTPException
+    from pydantic import BaseModel
+
+    # Add this class definition
+    class RepoRequest(BaseModel):
+        url: str
+        token: str = None
+
+    # Create an APIRouter
+    router = APIRouter()
+
+    @router.post("/repo/analyze")
+    async def analyze_repo_route(repo: RepoRequest):
+        # Your implementation to analyze the repository
+        # This will likely involve cloning the repo and running your analysis logic
+        try:
+            # Add your analysis logic here
+            return {"message": "Repository analysis started."}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @router.post("/repo/file-content")
+    async def file_content_route(payload: dict):
+        # Your implementation to get the content of a file from the repo
+        try:
+            # Add your file content retrieval logic here
+            return {"content": "File content from the repository"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Add this line at the end of your main.py to include the router
+    app.include_router(router)
+    ```
+
+#### **2. "Unchecked runtime.lastError: The message port closed before a response was received."**
+
+This error is almost always caused by a browser extension interfering with the page's scripts.
+
+  * **Fix:** Try the following:
+      * **Disable all browser extensions**, especially ad-blockers and script-blockers, and then reload the page.
+      * If that resolves the issue, re-enable your extensions one by one to identify the one causing the problem.
+
+### **JavaScript and Styling Issues**
+
+You've already identified the "Cannot read properties of null (reading 'addEventListener')" error and the incorrect styling of the FIM and system management buttons. Here are the solutions again for completeness:
+
+  * **`addEventListener` Error:** In your `playground.js` file, before adding an event listener to any element, you need to check if the element exists.
+
+    ```javascript
+    const myButton = document.getElementById('myButtonId');
+    if (myButton) {
+        myButton.addEventListener('click', () => {
+            // Your event handler code
+        });
+    }
+    ```
+
+  * **Button Styling:** In your `index.html`, the custom CSS is overriding Tailwind's styles.
+
+      * **Remove** the following CSS rule from your `<style>` block:
+        ```css
+        button {
+            color: inherit !important;
+        }
+        ```
+
+### **Other Console Warnings**
+
+The remaining console messages are warnings and suggestions that, while not critical, should be addressed to improve your application's quality:
+
+  * **WebGL Fallback:** This is a browser-level warning and not something you need to fix in your code. It's related to the user's browser and hardware configuration.
+  * **Sandbox and Feature Policy Errors:** These are related to the `<iframe>` attributes and the browser's security policies. While they don't seem to be breaking your app, you should review the `sandbox` and `allow` attributes on your iframes to ensure they are configured correctly for your needs.
+  * **Accessibility Warnings (`aria-hidden`, `aria-label`):** These warnings are important for making your application accessible to users with disabilities.
+      * **`aria-hidden`:** Do not use `aria-hidden` on an element that can receive focus (like a link or button) or that contains an element that can receive focus.
+      * **`aria-label`:** Any interactive element that doesn't have visible text (like an icon-only button) must have an `aria-label` attribute to describe its purpose to screen readers.
+  * **Performance Violations:**
+      * **Long-running handlers (`'message' handler took...`):** This indicates that some of your JavaScript code is taking a long time to execute, which can make your page unresponsive. You should investigate these long-running scripts and optimize them.
+      * **Forced reflow:** This happens when your JavaScript code forces the browser to recalculate the layout of the page, which can be slow. Avoid reading and writing to the DOM in quick succession.
+  * **"Password field is not contained in a form":** This is a browser warning suggesting that for better accessibility and user experience, password input fields should be part of a `<form>` element.
+
+By addressing these issues, starting with the critical errors, you can significantly improve the functionality, stability, and user experience of your CodeGuard Playground.
