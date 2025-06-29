@@ -16,6 +16,7 @@ from llm_prompt_generator import get_llm_prompt_generator
 from clean_code_prompt_enhancer import enhance_prompt_for_clean_code_output
 from deepseek_keepalive_handler import create_deepseek_handler
 from reliable_code_fixer import create_reliable_fixer
+from github_repo_context import get_repo_context_improver
 
 @dataclass
 class CodeImprovementRequest:
@@ -28,6 +29,8 @@ class CodeImprovementRequest:
     preserve_functionality: bool = True
     ai_provider: str = "openai"  # openai, deepseek, gemini, claude
     ai_api_key: Optional[str] = None
+    github_repo_url: Optional[str] = None  # GitHub repository URL for context
+    github_token: Optional[str] = None  # GitHub API token for private repos
 
 @dataclass
 class CodeImprovementResponse:
@@ -46,6 +49,7 @@ class MultiLLMCodeImprover:
         self.deepseek_api_key = None
         self.function_tools = self._setup_function_tools()
         self._initialize_providers()
+        self.repo_context_improver = None
     
     def _setup_function_tools(self):
         """Setup function tools for DeepSeek Function Calling."""
@@ -567,6 +571,27 @@ Always provide complete, working code in the improved_code field."""
         """
         ai_provider = request.ai_provider.lower() if request.ai_provider else "openai"
         
+        # Initialize repository context if GitHub URL provided
+        repo_context = ""
+        if request.github_repo_url:
+            try:
+                if not self.repo_context_improver:
+                    self.repo_context_improver = get_repo_context_improver(request.github_token)
+                
+                context_result = self.repo_context_improver.improve_code_with_repo_context(
+                    original_code=request.original_code,
+                    filename=request.filename,
+                    issues=[{"description": issue.description, "type": issue.type} for issue in request.issues],
+                    repo_url=request.github_repo_url
+                )
+                
+                if context_result.get("context_available"):
+                    repo_context = context_result["repository_context"]
+                    logger.info(f"Repository context loaded for {request.github_repo_url}")
+                
+            except Exception as e:
+                logger.warning(f"Could not load repository context: {e}")
+        
         # Generate custom prompt based on audit results using LLM
         prompt_generator = get_llm_prompt_generator()
         code_files = [CodeFile(filename=request.filename, content=request.original_code)]
@@ -577,6 +602,14 @@ Always provide complete, working code in the improved_code field."""
             code_files=code_files,
             ai_provider=ai_provider
         )
+        
+        # Enhance prompt with repository context if available
+        if repo_context:
+            enhanced_prompt = self._enhance_prompt_with_repo_context(
+                custom_prompt_response.get("system_prompt", ""),
+                repo_context
+            )
+            custom_prompt_response["system_prompt"] = enhanced_prompt
         
         try:
             # Route to appropriate AI provider with custom prompt
@@ -590,6 +623,27 @@ Always provide complete, working code in the improved_code field."""
                 
         except Exception as e:
             return self._handle_improvement_error(request, str(e))
+    
+    def _enhance_prompt_with_repo_context(self, base_prompt: str, repo_context: str) -> str:
+        """Enhance base prompt with repository context information."""
+        enhanced_parts = []
+        
+        # Add repository context section
+        enhanced_parts.append("=== REPOSITORY CONTEXT ===")
+        enhanced_parts.append(repo_context)
+        enhanced_parts.append("\n=== CODE IMPROVEMENT INSTRUCTIONS ===")
+        
+        # Add base prompt
+        enhanced_parts.append(base_prompt)
+        
+        # Add context-aware instructions
+        enhanced_parts.append("\nIMPORTANT: Use the repository context above to:")
+        enhanced_parts.append("- Follow the project's established patterns and conventions")
+        enhanced_parts.append("- Consider the framework and dependencies when making improvements")
+        enhanced_parts.append("- Maintain consistency with the existing codebase architecture")
+        enhanced_parts.append("- Apply project-specific best practices and coding standards")
+        
+        return '\n'.join(enhanced_parts)
     
     def _improve_with_openai(self, request: CodeImprovementRequest, custom_prompt_response=None) -> CodeImprovementResponse:
         """Use OpenAI GPT-4o for code improvement."""
