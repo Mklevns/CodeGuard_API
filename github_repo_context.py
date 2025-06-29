@@ -286,6 +286,70 @@ class GitHubRepoContextProvider:
             logger.debug(f"Could not fetch {file_path}: {e}")
             return None
     
+    def get_python_files(self, repo_url: str, max_files: int = 50) -> List[Dict[str, Any]]:
+        """Get list of Python files from repository with their metadata."""
+        try:
+            owner, repo_name = self.extract_repo_info_from_url(repo_url)
+            if not owner or not repo_name:
+                return []
+            
+            # Use Git Trees API to get all files recursively
+            url = f"{self.base_url}/repos/{owner}/{repo_name}/git/trees/HEAD"
+            response = self.session.get(url, params={'recursive': '1'})
+            
+            if response.status_code != 200:
+                return []
+            
+            tree_data = response.json()
+            python_files = []
+            
+            for item in tree_data.get('tree', []):
+                if item['type'] == 'blob' and item['path'].endswith('.py'):
+                    # Skip common non-essential files
+                    if any(skip in item['path'] for skip in ['__pycache__', '.git', 'test_', 'tests/', 'build/', 'dist/']):
+                        continue
+                    
+                    python_files.append({
+                        'path': item['path'],
+                        'filename': item['path'].split('/')[-1],
+                        'directory': '/'.join(item['path'].split('/')[:-1]) if '/' in item['path'] else '',
+                        'size': item.get('size', 0),
+                        'sha': item.get('sha', '')
+                    })
+                    
+                    if len(python_files) >= max_files:
+                        break
+            
+            # Sort by directory structure and filename
+            python_files.sort(key=lambda x: (x['directory'], x['filename']))
+            return python_files
+            
+        except Exception as e:
+            logger.error(f"Error fetching Python files: {e}")
+            return []
+    
+    def get_file_content_by_path(self, repo_url: str, file_path: str) -> Optional[Dict[str, Any]]:
+        """Get content of a specific file by its path in the repository."""
+        try:
+            owner, repo_name = self.extract_repo_info_from_url(repo_url)
+            if not owner or not repo_name:
+                return None
+            
+            content = self._get_file_content(owner, repo_name, file_path)
+            if content:
+                return {
+                    'path': file_path,
+                    'filename': file_path.split('/')[-1],
+                    'content': content,
+                    'size': len(content.encode('utf-8'))
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error fetching file content for {file_path}: {e}")
+            return None
+    
     def _analyze_dependencies(self, package_files: Dict[str, str]) -> Tuple[List[str], str]:
         """Analyze dependencies and detect framework."""
         dependencies = []

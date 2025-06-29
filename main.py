@@ -1688,6 +1688,75 @@ async def get_repository_context_summary(request: dict):
             "error": str(e)
         }
 
+@app.post("/repo/files")
+async def get_repository_python_files(request: dict):
+    """
+    Get list of Python files from a GitHub repository for file selection.
+    
+    Returns a list of Python files with their paths and metadata for
+    dropdown selection in the playground interface.
+    """
+    try:
+        repo_url = request.get("repo_url")
+        github_token = request.get("github_token")
+        max_files = request.get("max_files", 50)
+        
+        if not repo_url:
+            raise HTTPException(status_code=400, detail="Repository URL is required")
+        
+        # Initialize GitHub context provider
+        github_provider = get_repo_context_provider(github_token)
+        
+        # Get Python files list
+        python_files = github_provider.get_python_files(repo_url, max_files)
+        
+        return {
+            "status": "success",
+            "files": python_files,
+            "total_files": len(python_files),
+            "repo_url": repo_url
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch repository files: {str(e)}")
+
+@app.post("/repo/file-content")
+async def get_repository_file_content(request: dict):
+    """
+    Get content of a specific Python file from a GitHub repository.
+    
+    Fetches the actual file content for analysis and improvement.
+    """
+    try:
+        repo_url = request.get("repo_url")
+        file_path = request.get("file_path")
+        github_token = request.get("github_token")
+        
+        if not repo_url or not file_path:
+            raise HTTPException(status_code=400, detail="Repository URL and file path are required")
+        
+        # Initialize GitHub context provider
+        github_provider = get_repo_context_provider(github_token)
+        
+        # Get file content
+        file_content = github_provider.get_file_content_by_path(repo_url, file_path)
+        
+        if not file_content:
+            raise HTTPException(status_code=404, detail="File not found or not accessible")
+        
+        return {
+            "status": "success",
+            "file": file_content,
+            "repo_url": repo_url
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch file content: {str(e)}")
+
 if __name__ == "__main__":
     # Run the application - optimized for both development and Cloud Run
     environment = os.environ.get("ENVIRONMENT", "development")

@@ -65,6 +65,7 @@ class CodeGuardPlayground {
         // Repository context
         document.getElementById('githubRepoUrl').addEventListener('input', () => this.validateRepoUrl());
         document.getElementById('analyzeRepo').addEventListener('click', () => this.analyzeRepository());
+        document.getElementById('repoFileSelect').addEventListener('change', () => this.loadSelectedRepoFile());
 
         // Analysis buttons
         document.getElementById('auditBtn').addEventListener('click', () => this.auditCode());
