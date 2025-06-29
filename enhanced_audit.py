@@ -36,7 +36,8 @@ class EnhancedAuditEngine:
             'custom_rules': self._run_custom_rules,
             'rl_plugin': self._run_rl_plugin,
             'dependency_audit': self._run_dependency_audit,
-            'complexity_analysis': self._run_complexity_analysis
+            'complexity_analysis': self._run_complexity_analysis,
+            'cross_file_analysis': self._run_cross_file_analysis
         }
     
     def analyze_code(self, request: AuditRequest) -> AuditResponse:
@@ -870,3 +871,46 @@ class EnhancedAuditEngine:
             ))
 
         return issues, fixes
+    
+    def _run_cross_file_analysis(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
+        """Run cross-file analysis to detect unused code and circular dependencies."""
+        # This method will be called once per file, but we only want to run the analysis once per request
+        # We'll use a flag file to ensure this runs only once
+        flag_file = os.path.join(temp_dir, ".cross_file_analysis_done")
+        if os.path.exists(flag_file):
+            return [], []
+        
+        try:
+            # Create flag file to prevent multiple runs
+            with open(flag_file, 'w') as f:
+                f.write("done")
+            
+            # Collect all Python files in the temp directory
+            from models import CodeFile
+            code_files = []
+            
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.endswith('.py') and file != os.path.basename(flag_file):
+                        file_path_inner = os.path.join(root, file)
+                        try:
+                            with open(file_path_inner, 'r', encoding='utf-8') as f:
+                                file_content = f.read()
+                            code_files.append(CodeFile(filename=file, content=file_content))
+                        except Exception:
+                            continue
+            
+            if len(code_files) > 1:  # Only run if we have multiple files
+                return analyze_repository_structure(code_files)
+            
+        except Exception as e:
+            return [Issue(
+                filename="cross_file_analysis",
+                line=1,
+                type="error",
+                description=f"Cross-file analysis failed: {str(e)}",
+                source="graph_analyzer",
+                severity="warning"
+            )], []
+        
+        return [], []
