@@ -164,7 +164,7 @@ class SemanticVisitor(ast.NodeVisitor):
             elif func_name in ['randint', 'choice', 'random', 'uniform', 'normal'] and not self._has_seed_set():
                 self._flag_missing_seed(node, 'random')
         
-        # Check for module-level random calls
+        # Check for module-level random calls  
         elif isinstance(node.func, ast.Attribute):
             if isinstance(node.func.value, ast.Name):
                 module_name = node.func.value.id
@@ -172,12 +172,14 @@ class SemanticVisitor(ast.NodeVisitor):
                 
                 # Check numpy random without seeding
                 if module_name == 'np' and method_name in ['random', 'rand', 'randn', 'randint']:
-                    if not self._has_numpy_seed_set():
+                    numpy_seed_patterns = ['np.random.seed(', 'numpy.random.seed(']
+                    if not any(pattern in self.content for pattern in numpy_seed_patterns):
                         self._flag_missing_seed(node, 'numpy')
                 
                 # Check torch random without seeding
                 elif module_name == 'torch' and method_name in ['rand', 'randn', 'randint']:
-                    if not self._has_torch_seed_set():
+                    torch_seed_patterns = ['torch.manual_seed(', 'torch.cuda.manual_seed(']
+                    if not any(pattern in self.content for pattern in torch_seed_patterns):
                         self._flag_missing_seed(node, 'torch')
     
     def _analyze_method_call(self, node: ast.Call):
