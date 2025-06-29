@@ -660,6 +660,141 @@ class RepoContextEnhancedImprover:
     def __init__(self, github_context_provider: Optional[GitHubRepoContextProvider] = None):
         self.github_provider = github_context_provider or GitHubRepoContextProvider()
     
+    def improve_code_with_related_files(self, original_code: str, filename: str, 
+                                      issues: List[Any], fixes: List[Any],
+                                      repo_url: str, related_files: List[Dict[str, Any]],
+                                      ai_provider: str = "openai", ai_api_key: Optional[str] = None,
+                                      improvement_level: str = "moderate") -> Any:
+        """
+        Improve code with enhanced context from related files.
+        
+        This method builds a comprehensive prompt that includes related file context
+        to help the AI understand imports, dependencies, and coding patterns.
+        """
+        try:
+            from chatgpt_integration import CodeImprovementRequest, get_code_improver
+            from models import Issue, Fix
+            
+            # Build context summary from related files
+            context_summary = self._build_related_files_context(related_files)
+            
+            # Create enhanced original code with context
+            enhanced_code = f"""# REPOSITORY CONTEXT:
+# This file is part of a larger project. Related files provide important context:
+{context_summary}
+
+# TARGET FILE: {filename}
+{original_code}"""
+            
+            # Create improvement request with enhanced context
+            improvement_request = CodeImprovementRequest(
+                original_code=enhanced_code,
+                filename=filename,
+                issues=issues,
+                fixes=fixes,
+                improvement_level=improvement_level,
+                ai_provider=ai_provider,
+                ai_api_key=ai_api_key,
+                github_repo_url=repo_url
+            )
+            
+            # Get standard code improver and process
+            code_improver = get_code_improver()
+            response = code_improver.improve_code(improvement_request)
+            
+            # Clean up the response to remove context comments
+            if response.improved_code:
+                # Remove the context comments from the improved code
+                lines = response.improved_code.split('\n')
+                clean_lines = []
+                skip_context = True
+                
+                for line in lines:
+                    if line.strip().startswith(f'# TARGET FILE: {filename}'):
+                        skip_context = False
+                        continue
+                    elif not skip_context:
+                        clean_lines.append(line)
+                
+                response.improved_code = '\n'.join(clean_lines).strip()
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error in enhanced code improvement: {e}")
+            # Fallback to standard improvement
+            from chatgpt_integration import CodeImprovementRequest, get_code_improver
+            
+            standard_request = CodeImprovementRequest(
+                original_code=original_code,
+                filename=filename,
+                issues=issues,
+                fixes=fixes,
+                improvement_level=improvement_level,
+                ai_provider=ai_provider,
+                ai_api_key=ai_api_key
+            )
+            
+            code_improver = get_code_improver()
+            return code_improver.improve_code(standard_request)
+    
+    def _build_related_files_context(self, related_files: List[Dict[str, Any]]) -> str:
+        """Build a concise context summary from related files."""
+        if not related_files:
+            return "# No related files found"
+        
+        context_parts = [
+            f"# Found {len(related_files)} related files providing context:"
+        ]
+        
+        for i, file_info in enumerate(related_files, 1):
+            # Get key information about the file
+            size_kb = file_info.get('size', 0) // 1024
+            reason = file_info.get('reason', 'Unknown relevance')
+            score = file_info.get('relevance_score', 0.0)
+            
+            context_parts.append(f"# {i}. {file_info['filename']} ({file_info['path']}) - {reason} (Score: {score:.1f})")
+            
+            # Add key imports and classes from the related file
+            content = file_info.get('content', '')
+            key_info = self._extract_key_info_from_file(content)
+            if key_info:
+                context_parts.append(f"#    Key elements: {key_info}")
+        
+        return '\n'.join(context_parts)
+    
+    def _extract_key_info_from_file(self, content: str) -> str:
+        """Extract key imports and class definitions from file content."""
+        import re
+        
+        key_elements = []
+        
+        # Extract imports
+        import_patterns = [
+            r'from\s+(\S+)\s+import\s+(\S+)',
+            r'import\s+(\S+)'
+        ]
+        
+        for pattern in import_patterns:
+            matches = re.findall(pattern, content)
+            for match in matches[:3]:  # Limit to first 3 imports
+                if isinstance(match, tuple):
+                    key_elements.append(f"from {match[0]} import {match[1]}")
+                else:
+                    key_elements.append(f"import {match}")
+        
+        # Extract class definitions
+        class_matches = re.findall(r'class\s+(\w+)', content)
+        for class_name in class_matches[:2]:  # Limit to first 2 classes
+            key_elements.append(f"class {class_name}")
+        
+        # Extract function definitions
+        func_matches = re.findall(r'def\s+(\w+)', content)
+        for func_name in func_matches[:3]:  # Limit to first 3 functions
+            key_elements.append(f"def {func_name}()")
+        
+        return ', '.join(key_elements[:8])  # Limit total elements
+    
     def improve_code_with_repo_context(self, 
                                      original_code: str,
                                      filename: str,

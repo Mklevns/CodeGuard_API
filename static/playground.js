@@ -71,6 +71,7 @@ class CodeGuardPlayground {
         document.getElementById('auditBtn').addEventListener('click', () => this.auditCode());
         document.getElementById('improveBtn').addEventListener('click', () => this.improveCode());
         document.getElementById('auditImproveBtn').addEventListener('click', () => this.auditAndImprove());
+        document.getElementById('improveWithContextBtn').addEventListener('click', () => this.improveWithRelatedContext());
         document.getElementById('fimBtn').addEventListener('click', () => this.openFimTab());
         
         // FIM completion buttons
@@ -957,6 +958,7 @@ def evaluate_model():
             if (response.ok && result.status === 'success' && result.files.length > 0) {
                 this.populateFileDropdown(result.files);
                 this.showFileSelector();
+                this.showSmartContextButton();
             }
 
         } catch (error) {
@@ -1037,6 +1039,114 @@ def evaluate_model():
             console.error('Error loading file:', error);
             statusEl.innerHTML = '<span class="text-red-600">✗ Error loading file</span>';
         }
+    }
+
+    showSmartContextButton() {
+        const contextBtn = document.getElementById('improveWithContextBtn');
+        contextBtn.classList.remove('hidden');
+    }
+
+    async improveWithRelatedContext() {
+        const code = document.getElementById('codeInput').value.trim();
+        const filename = document.getElementById('filename').value || 'main.py';
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const aiProvider = document.getElementById('aiProvider').value;
+        
+        if (!code) {
+            alert('Please enter some code to improve');
+            return;
+        }
+
+        if (!apiKey) {
+            alert('Please enter your AI API key to use improvement features');
+            return;
+        }
+
+        if (!this.repositoryContext) {
+            alert('Please analyze a GitHub repository first to enable Smart Context Improve');
+            return;
+        }
+
+        // Get the selected file path
+        const selectEl = document.getElementById('repoFileSelect');
+        const selectedPath = selectEl.value;
+        
+        if (!selectedPath) {
+            alert('Please select a file from the repository dropdown');
+            return;
+        }
+
+        this.showStatus('Discovering related files and improving with AI context...');
+
+        try {
+            const payload = {
+                original_code: code,
+                filename: filename,
+                github_repo_url: this.repositoryContext.url,
+                github_token: this.repositoryContext.token,
+                target_file_path: selectedPath,
+                ai_provider: aiProvider,
+                ai_api_key: apiKey,
+                improvement_level: 'moderate',
+                max_related_files: 5
+            };
+
+            const response = await fetch(`${this.apiBaseUrl}/improve/with-related-context`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Smart Context Improve failed: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            // Display results with context information
+            this.displaySmartContextResults(result);
+            
+        } catch (error) {
+            console.error('Smart Context Improve error:', error);
+            alert(`Smart Context Improve failed: ${error.message}`);
+        } finally {
+            this.hideStatus();
+        }
+    }
+
+    displaySmartContextResults(result) {
+        // Show the improved code
+        document.getElementById('improvedCode').textContent = result.improved_code;
+        document.getElementById('confidence').textContent = Math.round(result.confidence_score * 100);
+        document.getElementById('confidenceScore').classList.remove('hidden');
+
+        // Show context enhancement notification
+        const enhancement = document.createElement('div');
+        enhancement.className = 'bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4';
+        enhancement.innerHTML = `
+            <h4 class="font-semibold text-indigo-800 mb-2">🔗 Smart Context Enhancement</h4>
+            <p class="text-indigo-700 text-sm mb-2">
+                AI analysis enhanced with ${result.related_files_used} related files from repository
+            </p>
+            <div class="text-xs text-indigo-600">
+                <strong>Related files used:</strong>
+                ${result.related_files.map(f => `${f.filename} (${f.reason})`).join(', ')}
+            </div>
+        `;
+
+        const improvedTab = document.getElementById('improvedTab');
+        improvedTab.insertBefore(enhancement, improvedTab.firstChild);
+
+        // Switch to improved tab and show results
+        this.switchTab('improved');
+        document.getElementById('resultsSection').classList.remove('hidden');
+        document.getElementById('summaryPanel').classList.remove('hidden');
+
+        // Update summary with context info
+        document.getElementById('issueCount').textContent = result.applied_fixes.length;
+        document.getElementById('fixCount').textContent = result.applied_fixes.length;
     }
 
     showContextEnhancementNotice(result) {

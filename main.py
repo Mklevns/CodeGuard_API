@@ -1853,21 +1853,31 @@ async def improve_code_with_related_context(request: dict):
                 repo_url, target_file_path, max_related_files
             )
         
-        # Get the code improver and enhance it with related files context
+        # Get the code improver
         code_improver = get_code_improver()
         
-        # Enhance the improvement process with related files
-        if related_files:
-            # Update the improvement prompt to include related files context
-            original_build_prompt = code_improver._build_improvement_prompt
+        # Create a custom improver method that includes related files context
+        if related_files and repo_url:
+            # Create enhanced context by modifying the GitHub repo URL to include related files info
+            from github_repo_context import RepoContextEnhancedImprover
             
-            def enhanced_build_prompt(req):
-                return original_build_prompt(req, related_files)
+            enhanced_improver = RepoContextEnhancedImprover()
             
-            code_improver._build_improvement_prompt = enhanced_build_prompt
-        
-        # Perform the improvement
-        response = code_improver.improve_code(improvement_request)
+            # Use the enhanced improver with related files context
+            response = enhanced_improver.improve_code_with_related_files(
+                original_code=original_code,
+                filename=filename,
+                issues=audit_result.issues,
+                fixes=audit_result.fixes,
+                repo_url=repo_url,
+                related_files=related_files,
+                ai_provider=ai_provider,
+                ai_api_key=ai_api_key,
+                improvement_level=improvement_level
+            )
+        else:
+            # Perform standard improvement
+            response = code_improver.improve_code(improvement_request)
         
         return {
             "status": "success",
