@@ -1757,6 +1757,143 @@ async def get_repository_file_content(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch file content: {str(e)}")
 
+@app.post("/repo/discover-related-files")
+async def discover_related_files(request: dict):
+    """
+    Discover files related to a target file for enhanced AI context.
+    
+    Uses intelligent analysis to find:
+    - Same directory files (config, __init__.py)
+    - Imported/dependency files
+    - Similar naming patterns
+    - Configuration files
+    - Parent directory utilities
+    """
+    try:
+        repo_url = request.get("repo_url")
+        target_file_path = request.get("target_file_path")
+        github_token = request.get("github_token")
+        max_files = request.get("max_files", 5)
+        
+        if not repo_url or not target_file_path:
+            raise HTTPException(status_code=400, detail="Repository URL and target file path are required")
+        
+        # Initialize GitHub context provider
+        github_provider = get_repo_context_provider(github_token)
+        
+        # Discover related files
+        related_files = github_provider.discover_related_files(repo_url, target_file_path, max_files)
+        
+        return {
+            "status": "success",
+            "target_file": target_file_path,
+            "related_files": related_files,
+            "total_related": len(related_files),
+            "repo_url": repo_url
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to discover related files: {str(e)}")
+
+@app.post("/improve/with-related-context")
+async def improve_code_with_related_context(request: dict):
+    """
+    Improve code with automatic discovery of related files for enhanced AI context.
+    
+    This endpoint automatically finds and includes related files from the repository
+    to provide the AI with better understanding of imports, dependencies, and patterns.
+    """
+    try:
+        original_code = request.get("original_code", "")
+        filename = request.get("filename", "")
+        repo_url = request.get("github_repo_url")
+        github_token = request.get("github_token")
+        target_file_path = request.get("target_file_path")
+        ai_provider = request.get("ai_provider", "openai")
+        ai_api_key = request.get("ai_api_key")
+        improvement_level = request.get("improvement_level", "moderate")
+        max_related_files = request.get("max_related_files", 5)
+        
+        if not original_code or not filename:
+            raise HTTPException(status_code=400, detail="Original code and filename are required")
+        
+        # First audit the code to get issues
+        from audit import analyze_code
+        from models import AuditRequest, CodeFile, AuditOptions
+        
+        audit_request = AuditRequest(
+            files=[CodeFile(filename=filename, content=original_code)],
+            options=AuditOptions(level="standard", framework="auto", target="gpu")
+        )
+        
+        audit_result = analyze_code(audit_request)
+        
+        # Convert to CodeImprovementRequest format
+        from chatgpt_integration import CodeImprovementRequest, get_code_improver
+        
+        improvement_request = CodeImprovementRequest(
+            original_code=original_code,
+            filename=filename,
+            issues=audit_result.issues,
+            fixes=audit_result.fixes,
+            improvement_level=improvement_level,
+            ai_provider=ai_provider,
+            ai_api_key=ai_api_key,
+            github_repo_url=repo_url,
+            github_token=github_token
+        )
+        
+        # Discover related files if repository context is available
+        related_files = []
+        if repo_url and target_file_path:
+            github_provider = get_repo_context_provider(github_token)
+            related_files = github_provider.discover_related_files(
+                repo_url, target_file_path, max_related_files
+            )
+        
+        # Get the code improver and enhance it with related files context
+        code_improver = get_code_improver()
+        
+        # Enhance the improvement process with related files
+        if related_files:
+            # Update the improvement prompt to include related files context
+            original_build_prompt = code_improver._build_improvement_prompt
+            
+            def enhanced_build_prompt(req):
+                return original_build_prompt(req, related_files)
+            
+            code_improver._build_improvement_prompt = enhanced_build_prompt
+        
+        # Perform the improvement
+        response = code_improver.improve_code(improvement_request)
+        
+        return {
+            "status": "success",
+            "original_code": original_code,
+            "improved_code": response.improved_code,
+            "applied_fixes": response.applied_fixes,
+            "improvement_summary": response.improvement_summary,
+            "confidence_score": response.confidence_score,
+            "warnings": response.warnings,
+            "related_files_used": len(related_files),
+            "related_files": [
+                {
+                    "path": f["path"],
+                    "filename": f["filename"],
+                    "relevance_score": f["relevance_score"],
+                    "reason": f["reason"]
+                } for f in related_files
+            ],
+            "context_enhanced": len(related_files) > 0
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Context-enhanced improvement failed: {str(e)}")
+
 if __name__ == "__main__":
     # Run the application - optimized for both development and Cloud Run
     environment = os.environ.get("ENVIRONMENT", "development")

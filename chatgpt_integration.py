@@ -844,17 +844,48 @@ You must improve THIS EXACT Python code by applying the specific fixes identifie
 """
         return prompt
     
-    def _build_improvement_prompt(self, request: CodeImprovementRequest) -> str:
-        """Build comprehensive prompt for ChatGPT code improvement."""
+    def _build_improvement_prompt(self, request: CodeImprovementRequest, related_files: Optional[List[Dict[str, Any]]] = None) -> str:
+        """Build comprehensive prompt for ChatGPT code improvement with optional related file context."""
         
         issues_summary = self._format_issues_for_prompt(request.issues)
         fixes_summary = self._format_fixes_for_prompt(request.fixes)
+        
+        # Build related files context
+        context_section = ""
+        if related_files and len(related_files) > 0:
+            context_parts = [
+                "\n**REPOSITORY CONTEXT:**",
+                "The following related files provide important context for understanding dependencies, imports, and coding patterns:",
+                ""
+            ]
+            
+            for i, file_info in enumerate(related_files, 1):
+                # Truncate large files to prevent prompt overflow
+                content_preview = file_info['content'][:1500] + ("..." if len(file_info['content']) > 1500 else "")
+                context_parts.extend([
+                    f"--- Related File {i}: {file_info['filename']} ---",
+                    f"Path: {file_info['path']}",
+                    f"Relevance: {file_info['reason']} (Score: {file_info['relevance_score']:.1f})",
+                    f"Content:",
+                    f"```python",
+                    content_preview,
+                    f"```",
+                    ""
+                ])
+            
+            context_parts.extend([
+                "--- END REPOSITORY CONTEXT ---",
+                "Use the above context to understand imports, class inheritance, configuration patterns, and project structure when improving the target file.",
+                ""
+            ])
+            
+            context_section = "\n".join(context_parts)
         
         prompt = f"""
 Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not create a generic example.
 
 **CRITICAL: You must improve the provided code, not write a new example.**
-
+{context_section}
 **Original Code to Fix ({request.filename}):**
 ```python
 {request.original_code}
@@ -874,6 +905,7 @@ Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not crea
 5. Preserve the original code's behavior and intent
 6. Fix security issues (pickle → json), add missing seeding, replace print → logging
 7. Remove unused imports, fix formatting only as specified
+8. Use the repository context to understand proper import statements and class usage patterns
 
 **Return JSON with:**
 - "improved_code": The original code with ONLY the listed fixes applied

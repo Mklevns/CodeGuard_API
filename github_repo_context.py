@@ -349,6 +349,200 @@ class GitHubRepoContextProvider:
         except Exception as e:
             logger.error(f"Error fetching file content for {file_path}: {e}")
             return None
+
+    def discover_related_files(self, repo_url: str, target_file_path: str, 
+                             max_related_files: int = 5) -> List[Dict[str, Any]]:
+        """
+        Discover files related to the target file for enhanced context.
+        
+        Uses multiple strategies:
+        1. Same directory files (especially __init__.py, config files)
+        2. Import analysis - files that import or are imported by target
+        3. Similar naming patterns (related modules)
+        4. Configuration and setup files
+        5. Documentation files relevant to the target
+        """
+        try:
+            owner, repo_name = self.extract_repo_info_from_url(repo_url)
+            if not owner or not repo_name:
+                return []
+            
+            related_files = []
+            target_dir = '/'.join(target_file_path.split('/')[:-1]) if '/' in target_file_path else ''
+            target_filename = target_file_path.split('/')[-1]
+            target_base_name = target_filename.replace('.py', '')
+            
+            # Get all Python files for analysis
+            all_files = self.get_python_files(repo_url, max_files=100)
+            
+            # Strategy 1: Same directory files (high priority)
+            same_dir_files = [f for f in all_files if f['directory'] == target_dir and f['path'] != target_file_path]
+            
+            # Prioritize __init__.py, config files, and base classes
+            priority_files = []
+            for file in same_dir_files:
+                if file['filename'] in ['__init__.py', 'config.py', 'settings.py', 'base.py']:
+                    priority_files.append({
+                        'file': file,
+                        'relevance_score': 0.9,
+                        'reason': 'Same directory - configuration/initialization file'
+                    })
+            
+            # Strategy 2: Import analysis - get target file content to analyze imports
+            target_content = self._get_file_content(owner, repo_name, target_file_path)
+            if target_content:
+                import_related = self._analyze_imports_for_context(target_content, all_files, target_dir)
+                related_files.extend(import_related)
+            
+            # Strategy 3: Similar naming patterns
+            naming_related = self._find_naming_related_files(target_base_name, all_files, target_file_path)
+            related_files.extend(naming_related)
+            
+            # Strategy 4: Configuration and setup files (project-wide context)
+            config_files = self._find_configuration_files(all_files)
+            related_files.extend(config_files)
+            
+            # Strategy 5: Parent directory files for shared utilities
+            if target_dir:
+                parent_dir = '/'.join(target_dir.split('/')[:-1]) if '/' in target_dir else ''
+                parent_files = self._find_parent_utilities(all_files, parent_dir, target_dir)
+                related_files.extend(parent_files)
+            
+            # Combine and prioritize
+            all_related = priority_files + related_files
+            
+            # Sort by relevance score and remove duplicates
+            seen_paths = set()
+            unique_related = []
+            for item in sorted(all_related, key=lambda x: x['relevance_score'], reverse=True):
+                if item['file']['path'] not in seen_paths:
+                    seen_paths.add(item['file']['path'])
+                    unique_related.append(item)
+            
+            # Get content for top related files
+            result = []
+            for item in unique_related[:max_related_files]:
+                file_content = self._get_file_content(owner, repo_name, item['file']['path'])
+                if file_content:
+                    result.append({
+                        'path': item['file']['path'],
+                        'filename': item['file']['filename'],
+                        'content': file_content,
+                        'size': len(file_content.encode('utf-8')),
+                        'relevance_score': item['relevance_score'],
+                        'reason': item['reason']
+                    })
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error discovering related files: {e}")
+            return []
+    
+    def _analyze_imports_for_context(self, target_content: str, all_files: List[Dict], target_dir: str) -> List[Dict]:
+        """Analyze imports in target file to find related files."""
+        import re
+        related = []
+        
+        # Find import statements
+        import_patterns = [
+            r'from\s+(\S+)\s+import',
+            r'import\s+(\S+)',
+            r'from\s+\.\s*(\S+)\s+import',  # Relative imports
+            r'from\s+\.\.(\S+)\s+import'    # Parent relative imports
+        ]
+        
+        imported_modules = set()
+        for pattern in import_patterns:
+            matches = re.findall(pattern, target_content)
+            imported_modules.update(matches)
+        
+        # Find files that match imported modules
+        for module in imported_modules:
+            module_parts = module.split('.')
+            for file_info in all_files:
+                file_base = file_info['filename'].replace('.py', '')
+                
+                # Direct module name match
+                if file_base in module_parts:
+                    related.append({
+                        'file': file_info,
+                        'relevance_score': 0.8,
+                        'reason': f'Imported module: {module}'
+                    })
+                
+                # Check if file is in imported package path
+                if module in file_info['path']:
+                    related.append({
+                        'file': file_info,
+                        'relevance_score': 0.7,
+                        'reason': f'Part of imported package: {module}'
+                    })
+        
+        return related
+    
+    def _find_naming_related_files(self, target_base_name: str, all_files: List[Dict], target_path: str) -> List[Dict]:
+        """Find files with similar naming patterns."""
+        related = []
+        
+        for file_info in all_files:
+            if file_info['path'] == target_path:
+                continue
+                
+            file_base = file_info['filename'].replace('.py', '')
+            
+            # Similar base names (e.g., model.py, model_utils.py, model_config.py)
+            if target_base_name in file_base or file_base in target_base_name:
+                score = 0.6 if len(file_base) > len(target_base_name) else 0.5
+                related.append({
+                    'file': file_info,
+                    'relevance_score': score,
+                    'reason': f'Similar naming pattern to {target_base_name}'
+                })
+            
+            # Test files
+            if file_base.startswith('test_' + target_base_name) or file_base == target_base_name + '_test':
+                related.append({
+                    'file': file_info,
+                    'relevance_score': 0.4,
+                    'reason': f'Test file for {target_base_name}'
+                })
+        
+        return related
+    
+    def _find_configuration_files(self, all_files: List[Dict]) -> List[Dict]:
+        """Find project configuration files that provide important context."""
+        config_patterns = [
+            'config.py', 'settings.py', 'constants.py', 'globals.py',
+            'env.py', 'environment.py', 'setup.py'
+        ]
+        
+        related = []
+        for file_info in all_files:
+            if file_info['filename'] in config_patterns:
+                related.append({
+                    'file': file_info,
+                    'relevance_score': 0.5,
+                    'reason': 'Project configuration file'
+                })
+        
+        return related
+    
+    def _find_parent_utilities(self, all_files: List[Dict], parent_dir: str, target_dir: str) -> List[Dict]:
+        """Find utility files in parent directories."""
+        utility_patterns = ['utils.py', 'helpers.py', 'common.py', 'shared.py', 'base.py']
+        
+        related = []
+        for file_info in all_files:
+            # Files in parent directory
+            if file_info['directory'] == parent_dir and file_info['filename'] in utility_patterns:
+                related.append({
+                    'file': file_info,
+                    'relevance_score': 0.4,
+                    'reason': 'Parent directory utility file'
+                })
+        
+        return related
     
     def _analyze_dependencies(self, package_files: Dict[str, str]) -> Tuple[List[str], str]:
         """Analyze dependencies and detect framework."""
