@@ -377,16 +377,8 @@ class MultiLLMCodeImprover:
         except requests.exceptions.RequestException as e:
             raise Exception(f"DeepSeek API request failed: {str(e)}")
         except (json.JSONDecodeError, KeyError) as e:
-            # Fallback: try to parse response text directly
-            try:
-                response_text = response.text.strip()
-                if response_text:
-                    return response_text
-                else:
-                    raise Exception("DeepSeek API returned empty response")
-            except Exception:
-                raise Exception(f"Failed to parse DeepSeek response: {str(e)}")
-            
+            # If JSON parsing fails, return a structured error response
+            raise Exception(f"Failed to parse DeepSeek response: {str(e)}")
         except Exception as e:
             return json.dumps({
                 "improved_code": "# Function calling completed",
