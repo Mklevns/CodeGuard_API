@@ -410,7 +410,7 @@ def evaluate_model():
         const fixesHtml = fixes.map(fix => `
             <div class="bg-green-50 p-3 rounded border-l-4 border-green-400 mt-2">
                 <h5 class="font-medium text-green-800 mb-1">Suggested Fix:</h5>
-                <p class="text-green-700 text-sm mb-2">${this.escapeHtml(fix.description)}</p>
+                <p class="text-green-700 text-sm mb-2">${this.escapeHtml(fix.suggestion || fix.description || 'No description available')}</p>
                 ${fix.replacement_code ? `
                     <div class="bg-green-100 p-2 rounded text-sm">
                         <strong>Replace with:</strong>
@@ -560,7 +560,10 @@ def evaluate_model():
     }
 
     escapeHtml(unsafe) {
-        return unsafe
+        if (unsafe === null || unsafe === undefined) {
+            return '';
+        }
+        return String(unsafe)
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
