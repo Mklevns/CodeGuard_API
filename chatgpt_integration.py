@@ -15,6 +15,7 @@ from models import Issue, Fix, CodeFile
 from llm_prompt_generator import get_llm_prompt_generator
 from clean_code_prompt_enhancer import enhance_prompt_for_clean_code_output
 from deepseek_keepalive_handler import create_deepseek_handler
+from reliable_code_fixer import create_reliable_fixer
 
 @dataclass
 class CodeImprovementRequest:
@@ -691,20 +692,31 @@ CRITICAL: The improved_code must be the entire corrected file, ready to replace 
 """
         
         try:
-            # Use the new keep-alive handler for DeepSeek
-            deepseek_handler = create_deepseek_handler(request.ai_api_key)
+            # Use simplified DeepSeek call with timeout handling
+            api_key = request.ai_api_key or os.getenv("DEEPSEEK_API_KEY")
             
-            # Convert issues to format expected by handler
-            issues_for_handler = [
-                {"line": issue.line, "description": issue.description}
-                for issue in request.issues
-            ]
-            
-            result = deepseek_handler.generate_code_improvement(
-                request.original_code, 
-                issues_for_handler, 
-                confidence_boost
-            )
+            if not api_key:
+                # Apply reliable automated fixes when no API key
+                reliable_fixer = create_reliable_fixer()
+                result = reliable_fixer.fix_code(request.original_code, request.issues, confidence_boost)
+            else:
+                # Try DeepSeek with timeout fallback
+                try:
+                    deepseek_handler = create_deepseek_handler(api_key)
+                    issues_for_handler = [
+                        {"line": issue.line, "description": issue.description}
+                        for issue in request.issues
+                    ]
+                    
+                    result = deepseek_handler.generate_code_improvement(
+                        request.original_code, 
+                        issues_for_handler, 
+                        confidence_boost
+                    )
+                except Exception:
+                    # Fallback to reliable automated fixes on DeepSeek error
+                    reliable_fixer = create_reliable_fixer()
+                    result = reliable_fixer.fix_code(request.original_code, request.issues, confidence_boost)
             
             # Apply confidence boost from custom prompt
             base_confidence = float(result.get("confidence_score", 0.8))
