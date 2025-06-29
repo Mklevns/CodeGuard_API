@@ -5,6 +5,7 @@ Enables AI-powered code improvement suggestions with OpenAI, DeepSeek R1, and ot
 
 import os
 import json
+import logging
 import re
 import requests
 from typing import List, Dict, Any, Optional, Tuple
@@ -73,9 +74,7 @@ class MultiLLMCodeImprover:
                     "content": prompt
                 }
             ],
-            "max_tokens": 4000,
-            "temperature": 0.1,
-            "stream": False
+            "max_tokens": 8000  # Increased for reasoning model
         }
         
         try:
@@ -83,17 +82,20 @@ class MultiLLMCodeImprover:
             response.raise_for_status()
             
             result = response.json()
-            content = result["choices"][0]["message"]["content"]
+            message = result["choices"][0]["message"]
             
-            # DeepSeek reasoner may include reasoning tokens, extract main content
-            if "<thinking>" in content and "</thinking>" in content:
-                # Extract content after reasoning section
-                content = content.split("</thinking>")[-1].strip()
+            # DeepSeek reasoner provides both reasoning_content and content
+            reasoning_content = message.get("reasoning_content", "")
+            final_content = message.get("content", "")
             
-            return content
+            # Return the final answer, optionally log reasoning for debugging
+            if reasoning_content and len(reasoning_content) > 100:
+                print(f"DeepSeek reasoning: {reasoning_content[:200]}...")
+            
+            return final_content or reasoning_content
             
         except requests.exceptions.Timeout:
-            raise Exception("DeepSeek reasoner API timed out - the model is analyzing your code")
+            raise Exception("DeepSeek reasoner is thinking deeply about your code - this may take longer than expected")
         except requests.exceptions.RequestException as e:
             raise Exception(f"DeepSeek API request failed: {str(e)}")
         except (KeyError, IndexError) as e:
