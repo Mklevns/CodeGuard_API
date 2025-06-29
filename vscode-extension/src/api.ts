@@ -198,6 +198,64 @@ export class CodeGuardAPI {
             preserve_functionality: true,
             ai_provider: aiProvider,
             ai_api_key: aiApiKey
+        }, { timeout: 120000 }); // 2 minute timeout for AI improvements
+        
+        return response.data;
+    }
+    
+    async improveProject(files: CodeFile[]): Promise<any> {
+        const response = await this.client.post('/improve/project', {
+            files,
+            improvement_level: 'moderate'
+        }, { timeout: 180000 }); // 3 minute timeout for project-wide improvements
+        
+        return response.data;
+    }
+    
+    async auditAndImprove(files: CodeFile[], options?: AuditOptions): Promise<any> {
+        const requestData = {
+            files,
+            options: {
+                level: options?.level || this.configManager.getAnalysisLevel(),
+                framework: options?.framework || 'auto',
+                target: options?.target || 'gpu'
+            }
+        };
+        
+        const response = await this.client.post('/audit-and-improve', requestData, {
+            timeout: 150000 // 2.5 minute timeout for combined workflow
+        });
+        
+        return response.data;
+    }
+    
+    async bulkFixByType(originalCode: string, filename: string, fixType: string, issues: Issue[]): Promise<any> {
+        const aiProvider = this.configManager.getAiProvider();
+        const aiApiKey = await this.configManager.getCurrentAiApiKey();
+        
+        const response = await this.client.post('/improve/bulk-fix', {
+            original_code: originalCode,
+            filename,
+            fix_type: fixType,
+            issues,
+            ai_provider: aiProvider,
+            ai_api_key: aiApiKey
+        }, { timeout: 90000 }); // 1.5 minute timeout for bulk fixes
+        
+        return response.data;
+    }
+    
+    async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAiSuggestions: boolean = true, applyFiltering: boolean = true): Promise<any> {
+        const response = await this.client.post('/reports/improvement-analysis', {
+            files,
+            format,
+            include_ai_suggestions: includeAiSuggestions,
+            apply_false_positive_filtering: applyFiltering
+        }, { timeout: 120000 }); // 2 minute timeout for report generation
+        
+        return response.data;
+    }
+}
         }, {
             timeout: 35000  // Extended timeout for async AI processing
         });
