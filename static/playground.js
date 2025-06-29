@@ -277,10 +277,16 @@ def evaluate_model():
                 applied_fixes: improveData.applied_fixes,
                 improvement_summary: improveData.improvement_summary,
                 confidence_score: improveData.confidence_score,
-                warnings: improveData.warnings
+                warnings: improveData.warnings,
+                repository_context_used: this.repositoryContext && improveData.repository_context_used
             };
             
             this.displayResults(this.currentResults, true);
+            
+            // Show context enhancement notice if repository context was used
+            if (this.repositoryContext && improveData.repository_context_used) {
+                this.showContextEnhancementNotice(improveData);
+            }
             
         } catch (error) {
             console.error('Improvement error:', error);
@@ -364,11 +370,18 @@ def evaluate_model():
                     : 'AI improvement not available (API key required)',
                 warnings: data.ai_improvements && Object.keys(data.ai_improvements).length > 0 
                     ? Object.values(data.ai_improvements)[0]?.warnings || []
-                    : []
+                    : [],
+                repository_context_used: this.repositoryContext && data.ai_improvements && 
+                    Object.values(data.ai_improvements)[0]?.repository_context_used
             };
             
             this.currentResults = transformedData;
             this.displayResults(transformedData, true);
+            
+            // Show context enhancement notice if repository context was used
+            if (this.repositoryContext && transformedData.repository_context_used) {
+                this.showContextEnhancementNotice(data.ai_improvements ? Object.values(data.ai_improvements)[0] : {});
+            }
             
         } catch (error) {
             console.error('Audit and improve error:', error);
