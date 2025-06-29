@@ -1906,6 +1906,355 @@ async def improve_code_with_related_context(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Context-enhanced improvement failed: {str(e)}")
 
+# Enhanced Repository Analysis Endpoints
+
+@app.get("/analysis/dependency-vulnerabilities")
+async def get_dependency_vulnerabilities():
+    """
+    Analyze project dependencies for security vulnerabilities and license issues.
+    
+    Returns vulnerability scan results from pip-audit and license analysis from pip-licenses.
+    """
+    try:
+        from enhanced_audit import EnhancedAuditEngine
+        from models import CodeFile, AuditRequest
+        import tempfile
+        import os
+        
+        # Check if we have dependency files to analyze
+        dependency_files = []
+        for filename in ["pyproject.toml", "requirements.txt", "setup.py"]:
+            if os.path.exists(filename):
+                try:
+                    with open(filename, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    dependency_files.append(CodeFile(filename=filename, content=content))
+                except Exception:
+                    continue
+        
+        if not dependency_files:
+            return {
+                "available": False,
+                "message": "No dependency files found (pyproject.toml, requirements.txt, setup.py)",
+                "vulnerabilities": [],
+                "license_issues": []
+            }
+        
+        # Run dependency audit
+        audit_engine = EnhancedAuditEngine()
+        all_issues = []
+        all_fixes = []
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for file in dependency_files:
+                file_path = os.path.join(temp_dir, file.filename)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(file.content)
+                
+                issues, fixes = audit_engine._run_dependency_audit(file_path, file.filename, file.content, temp_dir)
+                all_issues.extend(issues)
+                all_fixes.extend(fixes)
+        
+        # Categorize results
+        vulnerabilities = [issue for issue in all_issues if issue.type == "security"]
+        license_issues = [issue for issue in all_issues if issue.type == "license"]
+        
+        return {
+            "available": True,
+            "dependencies_analyzed": [f.filename for f in dependency_files],
+            "vulnerabilities": [
+                {
+                    "filename": issue.filename,
+                    "description": issue.description,
+                    "severity": issue.severity,
+                    "source": issue.source
+                }
+                for issue in vulnerabilities
+            ],
+            "license_issues": [
+                {
+                    "filename": issue.filename,
+                    "description": issue.description,
+                    "severity": issue.severity,
+                    "source": issue.source
+                }
+                for issue in license_issues
+            ],
+            "fixes_available": [
+                {
+                    "filename": fix.filename,
+                    "suggestion": fix.suggestion,
+                    "auto_fixable": fix.auto_fixable
+                }
+                for fix in all_fixes
+            ],
+            "summary": {
+                "total_vulnerabilities": len(vulnerabilities),
+                "total_license_issues": len(license_issues),
+                "critical_issues": len([v for v in vulnerabilities if v.severity == "error"]),
+                "recommendations": len(all_fixes)
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "available": False,
+            "error": f"Dependency analysis failed: {str(e)}",
+            "vulnerabilities": [],
+            "license_issues": []
+        }
+
+@app.get("/analysis/complexity-metrics")
+async def get_complexity_metrics():
+    """
+    Analyze code complexity metrics using radon for all Python files in the project.
+    
+    Returns cyclomatic complexity, maintainability index, and technical debt indicators.
+    """
+    try:
+        from enhanced_audit import EnhancedAuditEngine
+        from models import CodeFile
+        import os
+        import glob
+        
+        # Find all Python files in the project
+        python_files = []
+        for pattern in ["*.py", "**/*.py"]:
+            for filepath in glob.glob(pattern, recursive=True):
+                if os.path.isfile(filepath) and not filepath.startswith('.'):
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        python_files.append(CodeFile(filename=filepath, content=content))
+                    except Exception:
+                        continue
+        
+        if not python_files:
+            return {
+                "available": False,
+                "message": "No Python files found in the project",
+                "complexity_metrics": []
+            }
+        
+        # Run complexity analysis
+        audit_engine = EnhancedAuditEngine()
+        all_issues = []
+        all_fixes = []
+        
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for file in python_files:
+                file_path = os.path.join(temp_dir, os.path.basename(file.filename))
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(file.content)
+                
+                issues, fixes = audit_engine._run_complexity_analysis(file_path, file.filename, file.content, temp_dir)
+                all_issues.extend(issues)
+                all_fixes.extend(fixes)
+        
+        # Categorize complexity issues
+        complexity_issues = [issue for issue in all_issues if issue.type == "complexity"]
+        maintainability_issues = [issue for issue in all_issues if issue.type == "maintainability"]
+        
+        # Calculate project-wide metrics
+        total_functions = len([issue for issue in complexity_issues])
+        high_complexity_functions = len([issue for issue in complexity_issues if issue.severity == "error"])
+        
+        return {
+            "available": True,
+            "files_analyzed": len(python_files),
+            "complexity_issues": [
+                {
+                    "filename": issue.filename,
+                    "line": issue.line,
+                    "description": issue.description,
+                    "severity": issue.severity,
+                    "source": issue.source
+                }
+                for issue in complexity_issues
+            ],
+            "maintainability_issues": [
+                {
+                    "filename": issue.filename,
+                    "description": issue.description,
+                    "severity": issue.severity
+                }
+                for issue in maintainability_issues
+            ],
+            "refactoring_suggestions": [
+                {
+                    "filename": fix.filename,
+                    "line": fix.line,
+                    "suggestion": fix.suggestion
+                }
+                for fix in all_fixes
+            ],
+            "summary": {
+                "total_functions_analyzed": total_functions,
+                "high_complexity_functions": high_complexity_functions,
+                "maintainability_issues": len(maintainability_issues),
+                "refactoring_opportunities": len(all_fixes),
+                "technical_debt_score": min(1.0, (high_complexity_functions + len(maintainability_issues)) / max(total_functions, 1))
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "available": False,
+            "error": f"Complexity analysis failed: {str(e)}",
+            "complexity_metrics": []
+        }
+
+@app.get("/analysis/git-history")
+async def get_git_history_analysis(days: int = 90):
+    """
+    Analyze Git repository history to identify bug-prone files and code churn patterns.
+    
+    Args:
+        days: Number of days of history to analyze (default: 90)
+    
+    Returns comprehensive Git history analysis including bug-prone files and trends.
+    """
+    try:
+        git_analysis = analyze_git_history(".", days)
+        return git_analysis
+        
+    except Exception as e:
+        return {
+            "available": False,
+            "error": f"Git history analysis failed: {str(e)}",
+            "analysis_period_days": days
+        }
+
+@app.get("/analysis/repository-heatmap")
+async def get_repository_heatmap():
+    """
+    Generate comprehensive repository heatmap showing complexity, issues, and Git metrics.
+    
+    Combines static analysis results with Git history to create a visual heatmap of risk areas.
+    """
+    try:
+        from models import CodeFile, AuditRequest
+        import os
+        import glob
+        
+        # Collect all Python files
+        python_files = []
+        for pattern in ["*.py", "**/*.py"]:
+            for filepath in glob.glob(pattern, recursive=True):
+                if os.path.isfile(filepath) and not filepath.startswith('.'):
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        python_files.append(CodeFile(filename=filepath, content=content))
+                    except Exception:
+                        continue
+        
+        if not python_files:
+            return {
+                "available": False,
+                "message": "No Python files found for heatmap generation"
+            }
+        
+        # Run comprehensive audit
+        audit_request = AuditRequest(files=python_files)
+        audit_response = analyze_code(audit_request)
+        
+        # Get Git analysis
+        git_analysis = analyze_git_history(".", 90)
+        
+        # Get cross-file analysis
+        cross_file_issues, cross_file_fixes = analyze_repository_structure(python_files)
+        
+        # Build heatmap data
+        file_metrics = {}
+        
+        # Process static analysis results
+        for issue in audit_response.issues:
+            filename = issue.filename
+            if filename not in file_metrics:
+                file_metrics[filename] = {
+                    "filename": filename,
+                    "issue_count": 0,
+                    "severity_breakdown": {"error": 0, "warning": 0, "info": 0},
+                    "complexity_score": 0,
+                    "security_issues": 0,
+                    "git_metrics": {},
+                    "risk_score": 0.0
+                }
+            
+            file_metrics[filename]["issue_count"] += 1
+            file_metrics[filename]["severity_breakdown"][issue.severity] += 1
+            
+            if issue.type == "security":
+                file_metrics[filename]["security_issues"] += 1
+            if issue.type == "complexity":
+                file_metrics[filename]["complexity_score"] += 1
+        
+        # Add Git metrics if available
+        if git_analysis.get("available") and git_analysis.get("bug_prone_files"):
+            for bug_prone in git_analysis["bug_prone_files"]:
+                filename = bug_prone["filename"]
+                if filename in file_metrics:
+                    file_metrics[filename]["git_metrics"] = {
+                        "commit_count": bug_prone["commit_count"],
+                        "bug_fix_count": bug_prone["bug_fix_count"],
+                        "risk_score": bug_prone["risk_score"],
+                        "complexity_trend": bug_prone["complexity_trend"]
+                    }
+        
+        # Add cross-file analysis results
+        for issue in cross_file_issues:
+            filename = issue.filename
+            if filename in file_metrics:
+                if issue.type == "unused_code":
+                    file_metrics[filename]["unused_code"] = file_metrics[filename].get("unused_code", 0) + 1
+                elif issue.type == "circular_dependency":
+                    file_metrics[filename]["circular_dependencies"] = file_metrics[filename].get("circular_dependencies", 0) + 1
+        
+        # Calculate risk scores
+        for filename, metrics in file_metrics.items():
+            issue_factor = min(metrics["issue_count"] / 10, 1.0)
+            security_factor = min(metrics["security_issues"] / 3, 1.0)
+            complexity_factor = min(metrics["complexity_score"] / 5, 1.0)
+            git_factor = metrics["git_metrics"].get("risk_score", 0.0)
+            
+            metrics["risk_score"] = (
+                issue_factor * 0.3 +
+                security_factor * 0.3 +
+                complexity_factor * 0.2 +
+                git_factor * 0.2
+            )
+        
+        # Sort by risk score
+        sorted_files = sorted(file_metrics.values(), key=lambda x: x["risk_score"], reverse=True)
+        
+        return {
+            "available": True,
+            "files_analyzed": len(python_files),
+            "heatmap_data": sorted_files,
+            "summary": {
+                "total_files": len(file_metrics),
+                "high_risk_files": len([f for f in sorted_files if f["risk_score"] > 0.7]),
+                "medium_risk_files": len([f for f in sorted_files if 0.3 < f["risk_score"] <= 0.7]),
+                "low_risk_files": len([f for f in sorted_files if f["risk_score"] <= 0.3]),
+                "total_issues": sum(f["issue_count"] for f in sorted_files),
+                "total_security_issues": sum(f["security_issues"] for f in sorted_files),
+                "git_analysis_available": git_analysis.get("available", False)
+            },
+            "recommendations": [
+                f"Focus on {sorted_files[0]['filename']} - highest risk score ({sorted_files[0]['risk_score']:.2f})" if sorted_files else "No high-risk files identified",
+                f"Review {len([f for f in sorted_files if f['security_issues'] > 0])} files with security issues",
+                f"Consider refactoring {len([f for f in sorted_files if f['complexity_score'] > 2])} files with high complexity"
+            ]
+        }
+        
+    except Exception as e:
+        return {
+            "available": False,
+            "error": f"Repository heatmap generation failed: {str(e)}"
+        }
+
 if __name__ == "__main__":
     # Run the application - optimized for both development and Cloud Run
     environment = os.environ.get("ENVIRONMENT", "development")
