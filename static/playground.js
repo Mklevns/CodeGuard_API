@@ -2,6 +2,8 @@ class CodeGuardPlayground {
     constructor() {
         this.apiBaseUrl = window.location.origin;
         this.currentResults = null;
+        this.reportCache = new Map();
+        this.debouncedGenerateReport = this.debounce(this.generateReport.bind(this), 300);
         this.init();
     }
 
@@ -382,11 +384,21 @@ def evaluate_model():
         // Display improved code if available
         if (hasImprovedCode && data.improved_code) {
             document.getElementById('improvedCode').textContent = data.improved_code;
-            Prism.highlightElement(document.getElementById('improvedCode'));
+            
+            // Defer syntax highlighting to avoid blocking UI
+            if (window.requestIdleCallback) {
+                requestIdleCallback(() => {
+                    Prism.highlightElement(document.getElementById('improvedCode'));
+                });
+            } else {
+                setTimeout(() => {
+                    Prism.highlightElement(document.getElementById('improvedCode'));
+                }, 16);
+            }
         }
 
-        // Generate comprehensive report
-        this.generateReport(data);
+        // Generate comprehensive report (debounced)
+        this.debouncedGenerateReport(data);
 
         this.showResults();
     }
@@ -498,16 +510,36 @@ def evaluate_model():
         });
         document.getElementById(`${tabName}Tab`).classList.remove('hidden');
 
-        // Trigger syntax highlighting for improved code tab
+        // Defer syntax highlighting using requestIdleCallback for better performance
         if (tabName === 'improved' && this.currentResults?.improved_code) {
-            setTimeout(() => {
-                Prism.highlightElement(document.getElementById('improvedCode'));
-            }, 100);
+            if (window.requestIdleCallback) {
+                requestIdleCallback(() => {
+                    Prism.highlightElement(document.getElementById('improvedCode'));
+                });
+            } else {
+                // Fallback for older browsers
+                setTimeout(() => {
+                    Prism.highlightElement(document.getElementById('improvedCode'));
+                }, 16); // ~1 frame delay
+            }
         }
     }
 
     async generateReport(data) {
         try {
+            const code = document.getElementById('codeInput').value;
+            const filename = document.getElementById('filename').value || 'main.py';
+            const filtering = document.getElementById('filterFalsePositives').checked;
+            
+            // Create cache key
+            const cacheKey = `${filename}:${code.length}:${filtering}:${Date.now() - (Date.now() % 300000)}`; // 5min cache
+            
+            // Check cache first
+            if (this.reportCache.has(cacheKey)) {
+                document.getElementById('reportContent').innerHTML = this.reportCache.get(cacheKey);
+                return;
+            }
+
             const response = await fetch(`${this.apiBaseUrl}/reports/improvement-analysis`, {
                 method: 'POST',
                 headers: {
@@ -515,23 +547,47 @@ def evaluate_model():
                 },
                 body: JSON.stringify({
                     files: [{
-                        filename: document.getElementById('filename').value || 'main.py',
-                        content: document.getElementById('codeInput').value
+                        filename: filename,
+                        content: code
                     }],
                     format: 'html',
                     include_ai_suggestions: true,
-                    apply_false_positive_filtering: document.getElementById('filterFalsePositives').checked
+                    apply_false_positive_filtering: filtering
                 })
             });
 
             if (response.ok) {
                 const reportData = await response.json();
-                document.getElementById('reportContent').innerHTML = reportData.report || 'Report generation failed';
+                const reportContent = reportData.report || 'Report generation failed';
+                
+                // Cache the result
+                this.reportCache.set(cacheKey, reportContent);
+                
+                // Clean cache if it gets too large
+                if (this.reportCache.size > 10) {
+                    const firstKey = this.reportCache.keys().next().value;
+                    this.reportCache.delete(firstKey);
+                }
+                
+                document.getElementById('reportContent').innerHTML = reportContent;
             }
         } catch (error) {
             console.error('Report generation error:', error);
             document.getElementById('reportContent').innerHTML = 'Failed to generate comprehensive report';
         }
+    }
+
+    // Utility function for debouncing
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
     }
 
     copyImprovedCode() {
