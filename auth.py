@@ -72,12 +72,23 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     Returns:
         User information dictionary
     """
-    verify_api_key(credentials)
+    from fastapi import HTTPException
+    import os
     
-    stored_api_key = get_api_key_from_env()
-    
-    return {
-        "authenticated": True,
-        "mode": "development" if not stored_api_key else "production",
-        "api_key_hash": hash_api_key(credentials.credentials)[:8] if credentials and credentials.credentials else "dev-mode"
-    }
+    try:
+        verify_api_key(credentials)
+        stored_api_key = get_api_key_from_env()
+        return {
+            "authenticated": True,
+            "mode": "development" if not stored_api_key else "production",
+            "api_key_hash": hash_api_key(credentials.credentials)[:8] if credentials and credentials.credentials else "dev-mode"
+        }
+    except HTTPException:
+        # In development mode, allow unauthenticated access
+        if os.getenv("ENVIRONMENT", "development") == "development":
+            return {
+                "authenticated": False,
+                "mode": "development",
+                "api_key_hash": "dev-mode"
+            }
+        raise
