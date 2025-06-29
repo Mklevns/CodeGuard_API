@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from openai import OpenAI
 from models import Issue, Fix, CodeFile
+from adaptive_prompt_generator import get_adaptive_prompt_generator
 
 @dataclass
 class CodeImprovementRequest:
@@ -562,6 +563,20 @@ Always provide complete, working code in the improved_code field."""
             Response with improved code and explanations
         """
         ai_provider = request.ai_provider.lower() if request.ai_provider else "openai"
+        
+        # Generate custom prompt based on audit results
+        prompt_generator = get_adaptive_prompt_generator()
+        code_files = [CodeFile(filename=request.filename, content=request.original_code)]
+        
+        custom_prompt_data = prompt_generator.generate_custom_prompt(
+            issues=request.issues,
+            fixes=request.fixes,
+            code_files=code_files,
+            ai_provider=ai_provider
+        )
+        
+        # Store custom prompt for use in provider methods
+        request._custom_prompt_data = custom_prompt_data
         
         try:
             # Route to appropriate AI provider
