@@ -395,6 +395,15 @@ Preferred communication style: Simple, everyday language.
 - File dropdown shows organized file structure with directory paths for easy navigation
 - Selected files load directly into code editor with source attribution and context preservation
 - Seamless integration with existing audit and improvement workflows using repository context
+- **June 29, 2025**: Smart Context Discovery System implemented for enhanced AI code analysis
+- Added intelligent related file discovery using multiple analysis strategies: same directory files, import analysis, naming patterns, configuration files, and parent utilities
+- Created `/repo/discover-related-files` endpoint that finds up to 5 most relevant files with relevance scoring
+- Implemented `/improve/with-related-context` endpoint for AI improvements enhanced with repository context
+- Added Smart Context Improve button in playground that automatically discovers related files and feeds them to AI
+- System analyzes imports, class inheritance, configuration patterns, and project structure for better context
+- AI now receives comprehensive repository context including related file contents, import relationships, and coding patterns
+- Successfully tested with PyTorch examples repository showing 5 related files discovered with proper relevance scoring
+- Enhanced code improvement confidence and accuracy through intelligent context discovery
 
 ## Deployment Status
 
