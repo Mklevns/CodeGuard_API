@@ -160,9 +160,25 @@ class SemanticVisitor(ast.NodeVisitor):
             if func_name in ['eval', 'exec']:
                 self._flag_dangerous_builtin(node, func_name)
             
-            # Check for missing seeding functions
-            elif func_name in ['random', 'randint', 'choice'] and not self._has_seed_set():
+            # Check for random functions without seeding
+            elif func_name in ['randint', 'choice', 'random', 'uniform', 'normal'] and not self._has_seed_set():
                 self._flag_missing_seed(node, 'random')
+        
+        # Check for module-level random calls
+        elif isinstance(node.func, ast.Attribute):
+            if isinstance(node.func.value, ast.Name):
+                module_name = node.func.value.id
+                method_name = node.func.attr
+                
+                # Check numpy random without seeding
+                if module_name == 'np' and method_name in ['random', 'rand', 'randn', 'randint']:
+                    if not self._has_numpy_seed_set():
+                        self._flag_missing_seed(node, 'numpy')
+                
+                # Check torch random without seeding
+                elif module_name == 'torch' and method_name in ['rand', 'randn', 'randint']:
+                    if not self._has_torch_seed_set():
+                        self._flag_missing_seed(node, 'torch')
     
     def _analyze_method_call(self, node: ast.Call):
         """Analyze method calls like obj.method()."""
@@ -221,16 +237,25 @@ class SemanticVisitor(ast.NodeVisitor):
             'nn.Module',
             'keras.Model',
             'tf.keras.Model',
-            'Model'
+            'Model',
+            'Sequential',  # torch.nn.Sequential
+            'nn.Sequential'
         ]
         
         if any(pattern in obj_type for pattern in safe_patterns):
             return True
         
         # Check common variable naming patterns for models
-        model_patterns = ['model', 'net', 'network', 'vae', 'gan', 'cnn', 'rnn', 'lstm']
+        model_patterns = ['model', 'net', 'network', 'vae', 'gan', 'cnn', 'rnn', 'lstm', 'encoder', 'decoder']
         if any(pattern in obj_name.lower() for pattern in model_patterns):
             return True
+        
+        # Check if the variable was assigned from a known ML framework constructor
+        if obj_name in self.variable_types:
+            var_type = self.variable_types[obj_name].lower()
+            ml_constructors = ['module', 'sequential', 'linear', 'conv', 'lstm', 'gru', 'transformer']
+            if any(constructor in var_type for constructor in ml_constructors):
+                return True
         
         return False
     
@@ -304,14 +329,27 @@ class SemanticVisitor(ast.NodeVisitor):
     
     def _has_seed_set(self) -> bool:
         """Check if random seed has been set in the code."""
-        # Simple check for seed-setting patterns in the content
         seed_patterns = [
             'random.seed(',
-            'np.random.seed(',
-            'torch.manual_seed(',
-            'tf.random.set_seed('
+            'seed('
         ]
-        
+        return any(pattern in self.content for pattern in seed_patterns)
+    
+    def _has_numpy_seed_set(self) -> bool:
+        """Check if numpy random seed has been set."""
+        seed_patterns = [
+            'np.random.seed(',
+            'numpy.random.seed('
+        ]
+        return any(pattern in self.content for pattern in seed_patterns)
+    
+    def _has_torch_seed_set(self) -> bool:
+        """Check if torch random seed has been set."""
+        seed_patterns = [
+            'torch.manual_seed(',
+            'torch.cuda.manual_seed(',
+            'torch.cuda.manual_seed_all('
+        ]
         return any(pattern in self.content for pattern in seed_patterns)
     
     def _check_rl_environment_usage(self, node: ast.For):

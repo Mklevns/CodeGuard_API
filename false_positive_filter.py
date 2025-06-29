@@ -11,10 +11,11 @@ from models import Issue, Fix, CodeFile
 from semantic_analyzer import SemanticFalsePositiveFilter
 
 class FalsePositiveFilter:
-    """Filters out false positive issues using ChatGPT analysis."""
+    """Filters out false positive issues using semantic analysis and ChatGPT validation."""
     
     def __init__(self):
         self._openai_client = None
+        self._semantic_filter = SemanticFalsePositiveFilter()
         self._initialize_openai()
     
     def _initialize_openai(self):
@@ -31,7 +32,7 @@ class FalsePositiveFilter:
     
     def filter_issues(self, issues: List[Issue], fixes: List[Fix], code_files: List[CodeFile]) -> Tuple[List[Issue], List[Fix]]:
         """
-        Filter out false positive issues using fast rule-based analysis.
+        Filter out false positive issues using semantic analysis and fast rule-based filtering.
         
         Args:
             issues: List of detected issues
@@ -45,21 +46,26 @@ class FalsePositiveFilter:
             return issues, fixes
         
         try:
-            # Fast rule-based filtering for common false positives
-            filtered_issues = []
+            # Step 1: Apply semantic analysis for intelligent filtering
+            semantic_filtered_issues, semantic_filtered_fixes = self._semantic_filter.filter_with_semantics(
+                issues, fixes, code_files
+            )
             
-            for issue in issues:
+            # Step 2: Apply fast rule-based filtering for common false positives
+            final_filtered_issues = []
+            
+            for issue in semantic_filtered_issues:
                 # Keep all high-severity issues
                 if issue.severity in ['error']:
-                    filtered_issues.append(issue)
+                    final_filtered_issues.append(issue)
                     continue
                 
                 # Apply simple heuristics for common false positives
                 description_lower = issue.description.lower()
                 
-                # Keep security-related issues
-                if any(keyword in description_lower for keyword in ['pickle', 'eval', 'exec', 'unsafe']):
-                    filtered_issues.append(issue)
+                # Keep security-related issues (semantic analysis should have validated these)
+                if any(keyword in description_lower for keyword in ['pickle', 'exec', 'unsafe']):
+                    final_filtered_issues.append(issue)
                     continue
                 
                 # Skip common false positive patterns - updated to match actual issue descriptions
@@ -86,21 +92,51 @@ class FalsePositiveFilter:
                     continue  # Skip these common style issues
                 
                 # Keep all other issues
-                filtered_issues.append(issue)
+                final_filtered_issues.append(issue)
             
             # Filter corresponding fixes
-            filtered_lines = {issue.line for issue in filtered_issues}
-            filtered_fixes = [fix for fix in fixes if hasattr(fix, 'line') and fix.line in filtered_lines]
+            filtered_lines = {issue.line for issue in final_filtered_issues}
+            final_filtered_fixes = [fix for fix in semantic_filtered_fixes if hasattr(fix, 'line') and fix.line in filtered_lines]
             
-            filtered_count = len(issues) - len(filtered_issues)
-            if filtered_count > 0:
-                print(f"Filtered {filtered_count} potential false positives using fast rules")
+            # Report filtering results
+            original_count = len(issues)
+            semantic_count = len(semantic_filtered_issues)
+            final_count = len(final_filtered_issues)
             
-            return filtered_issues, filtered_fixes
+            semantic_filtered = original_count - semantic_count
+            rule_filtered = semantic_count - final_count
+            total_filtered = original_count - final_count
+            
+            if total_filtered > 0:
+                print(f"Filtered {total_filtered} potential false positives:")
+                if semantic_filtered > 0:
+                    print(f"  - {semantic_filtered} filtered by semantic analysis (AST-based)")
+                if rule_filtered > 0:
+                    print(f"  - {rule_filtered} filtered by fast rules (style/format)")
+            
+            return final_filtered_issues, final_filtered_fixes
             
         except Exception as e:
             print(f"Warning: False positive filtering failed: {e}")
-            return issues, fixes
+            # Fallback to basic rule-based filtering
+            return self._fallback_filter(issues, fixes)
+    
+    def _fallback_filter(self, issues: List[Issue], fixes: List[Fix]) -> Tuple[List[Issue], List[Fix]]:
+        """Fallback filtering when semantic analysis fails."""
+        filtered_issues = []
+        
+        for issue in issues:
+            # Keep high-severity and security issues
+            if (issue.severity in ['error'] or 
+                any(keyword in issue.description.lower() for keyword in ['pickle', 'eval', 'exec', 'unsafe'])):
+                filtered_issues.append(issue)
+        
+        # Filter corresponding fixes
+        filtered_lines = {issue.line for issue in filtered_issues}
+        filtered_fixes = [fix for fix in fixes if hasattr(fix, 'line') and fix.line in filtered_lines]
+        
+        print(f"Applied fallback filtering: {len(filtered_issues)} issues kept from {len(issues)} original")
+        return filtered_issues, filtered_fixes
     
     def _group_issues_by_file(self, issues: List[Issue], code_files: List[CodeFile]) -> List[Dict[str, Any]]:
         """Group issues by filename with code context."""
