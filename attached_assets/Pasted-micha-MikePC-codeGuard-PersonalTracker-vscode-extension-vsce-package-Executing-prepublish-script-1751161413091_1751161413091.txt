@@ -1,0 +1,52 @@
+micha@MikePC:~/codeGuard/PersonalTracker/vscode-extension$ vsce package
+Executing prepublish script 'npm run vscode:prepublish'...
+
+> codeguard@0.2.0 vscode:prepublish
+> npm run compile
+
+
+> codeguard@0.2.0 compile
+> tsc -p ./
+
+src/extension.ts:127:38 - error TS2339: Property 'auditCode' does not exist on type 'CodeGuardAPI'.
+
+127             const result = await api.auditCode(files);
+                                         ~~~~~~~~~
+
+src/extension.ts:164:38 - error TS2339: Property 'generateReport' does not exist on type 'CodeGuardAPI'.
+
+164         const reportData = await api.generateReport(7, result.value);
+                                         ~~~~~~~~~~~~~~
+
+src/extension.ts:241:43 - error TS2339: Property 'auditCode' does not exist on type 'CodeGuardAPI'.
+
+241             const auditResult = await api.auditCode([{ filename, content }]);
+                                              ~~~~~~~~~
+
+src/project_setup.ts:31:46 - error TS2339: Property 'getProjectTemplates' does not exist on type 'CodeGuardAPI'.
+
+31             const templates = await this.api.getProjectTemplates();
+                                                ~~~~~~~~~~~~~~~~~~~
+
+src/project_setup.ts:46:63 - error TS2339: Property 'template' does not exist on type 'string'.
+
+46                 await this.createProjectFromTemplate(selected.template);
+                                                                 ~~~~~~~~
+
+src/project_setup.ts:89:44 - error TS2339: Property 'previewProject' does not exist on type 'CodeGuardAPI'.
+
+89             const preview = await this.api.previewProject(template.name);
+                                              ~~~~~~~~~~~~~~
+
+src/project_setup.ts:104:47 - error TS2339: Property 'generateProject' does not exist on type 'CodeGuardAPI'.
+
+104                 const result = await this.api.generateProject(template.name, projectPath);
+                                                  ~~~~~~~~~~~~~~~
+
+
+Found 7 errors in 2 files.
+
+Errors  Files
+     3  src/extension.ts:127
+     4  src/project_setup.ts:31
+ ERROR  npm failed with exit code 2
