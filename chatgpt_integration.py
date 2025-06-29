@@ -14,6 +14,7 @@ from openai import OpenAI
 from models import Issue, Fix, CodeFile
 from llm_prompt_generator import get_llm_prompt_generator
 from clean_code_prompt_enhancer import enhance_prompt_for_clean_code_output
+from deepseek_keepalive_handler import create_deepseek_handler
 
 @dataclass
 class CodeImprovementRequest:
@@ -690,21 +691,20 @@ CRITICAL: The improved_code must be the entire corrected file, ready to replace 
 """
         
         try:
-            # Try DeepSeek with shorter timeout
-            response_text = self._call_deepseek_r1(prompt, request.ai_api_key)
+            # Use the new keep-alive handler for DeepSeek
+            deepseek_handler = create_deepseek_handler(request.ai_api_key)
             
-            # Parse DeepSeek response - should be clean JSON with response_format
-            try:
-                result = json.loads(response_text)
-                
-                # Validate that we got improved code
-                if not result.get("improved_code") or result.get("improved_code") == request.original_code:
-                    # If no improvement, apply basic fixes ourselves
-                    result = self._apply_basic_fixes_fallback(request, confidence_boost)
-                    
-            except (json.JSONDecodeError, AttributeError, TypeError) as e:
-                # If JSON parsing fails, apply basic fixes
-                result = self._apply_basic_fixes_fallback(request, confidence_boost)
+            # Convert issues to format expected by handler
+            issues_for_handler = [
+                {"line": issue.line, "description": issue.description}
+                for issue in request.issues
+            ]
+            
+            result = deepseek_handler.generate_code_improvement(
+                request.original_code, 
+                issues_for_handler, 
+                confidence_boost
+            )
             
             # Apply confidence boost from custom prompt
             base_confidence = float(result.get("confidence_score", 0.8))
