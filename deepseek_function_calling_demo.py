@@ -125,20 +125,19 @@ def run_function_calling_demo():
         # Create mock issues for demonstration
         issues = [
             Issue(
+                filename=filename,
                 line=5,
-                column=1,
-                message="Security vulnerability detected",
-                rule="security-check",
-                severity="error",
-                issue_type="security",
-                source="security_scanner"
+                type="security",
+                description="Security vulnerability detected",
+                source="security_scanner",
+                severity="error"
             )
         ]
         
         fixes = [
             Fix(
+                filename=filename,
                 line=5,
-                description="Replace unsafe operations with secure alternatives",
                 suggestion="Use safer serialization methods",
                 auto_fixable=False
             )
