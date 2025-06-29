@@ -1504,6 +1504,190 @@ async def experimental_improvement(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Experimental improvement failed: {str(e)}")
 
+# GitHub Repository Context Endpoints
+@app.post("/repo/analyze")
+async def analyze_github_repository(request: dict):
+    """
+    Analyze a GitHub repository to extract context information for AI code improvements.
+    
+    Provides comprehensive repository context including:
+    - Repository metadata (description, language, topics)
+    - Project structure and file organization  
+    - Dependencies and framework detection
+    - README content summary
+    - Package files (requirements.txt, package.json, etc.)
+    """
+    try:
+        repo_url = request.get("repo_url")
+        github_token = request.get("github_token")
+        
+        if not repo_url:
+            raise HTTPException(status_code=400, detail="Repository URL is required")
+        
+        # Initialize GitHub context provider
+        github_provider = get_repo_context_provider(github_token)
+        
+        # Get repository information
+        repo_info = github_provider.get_repository_info(repo_url)
+        
+        if not repo_info:
+            raise HTTPException(status_code=404, detail="Repository not found or not accessible")
+        
+        # Generate context summary for AI
+        context_summary = github_provider.generate_context_summary(repo_info)
+        
+        return {
+            "status": "success",
+            "repository": {
+                "owner": repo_info.owner,
+                "name": repo_info.name,
+                "description": repo_info.description,
+                "language": repo_info.language,
+                "topics": repo_info.topics,
+                "framework": repo_info.framework,
+                "dependencies_count": len(repo_info.dependencies),
+                "key_dependencies": repo_info.dependencies[:10]  # Top 10 dependencies
+            },
+            "context_summary": context_summary,
+            "file_structure_overview": repo_info.file_structure,
+            "package_files_found": list(repo_info.package_files.keys()),
+            "context_available": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Repository analysis failed: {str(e)}")
+
+@app.post("/improve/with-repo-context")
+async def improve_code_with_repository_context(request: dict):
+    """
+    Improve code using AI with enhanced repository context for better results.
+    
+    This endpoint provides context-aware code improvements by:
+    - Analyzing the source repository structure and patterns
+    - Understanding project dependencies and framework
+    - Following established coding conventions
+    - Applying project-specific best practices
+    """
+    try:
+        # Extract request parameters
+        original_code = request.get("original_code", "")
+        filename = request.get("filename", "")
+        issues = request.get("issues", [])
+        fixes = request.get("fixes", [])
+        repo_url = request.get("github_repo_url")
+        github_token = request.get("github_token")
+        ai_provider = request.get("ai_provider", "openai")
+        ai_api_key = request.get("ai_api_key")
+        improvement_level = request.get("improvement_level", "moderate")
+        
+        if not original_code or not filename:
+            raise HTTPException(status_code=400, detail="Original code and filename are required")
+        
+        # Convert issues to proper objects
+        from models import Issue
+        issue_objects = [
+            Issue(
+                filename=issue.get("filename", filename),
+                line=issue.get("line", 1),
+                type=issue.get("type", "unknown"),
+                description=issue.get("description", ""),
+                source=issue.get("source", "unknown"),
+                severity=issue.get("severity", "warning")
+            ) for issue in issues
+        ]
+        
+        # Create improvement request with repository context
+        improvement_request = CodeImprovementRequest(
+            original_code=original_code,
+            filename=filename,
+            issues=issue_objects,
+            fixes=[],
+            improvement_level=improvement_level,
+            preserve_functionality=True,
+            ai_provider=ai_provider,
+            ai_api_key=ai_api_key,
+            github_repo_url=repo_url,
+            github_token=github_token
+        )
+        
+        # Use code improver with repository context
+        code_improver = get_code_improver()
+        response = code_improver.improve_code(improvement_request)
+        
+        return {
+            "improved_code": response.improved_code,
+            "applied_fixes": response.applied_fixes,
+            "improvement_summary": response.improvement_summary,
+            "confidence_score": response.confidence_score,
+            "warnings": response.warnings,
+            "repository_context_used": bool(repo_url),
+            "ai_provider": ai_provider,
+            "enhancement_details": {
+                "context_enhanced": bool(repo_url),
+                "original_issues_count": len(issue_objects),
+                "fixes_applied_count": len(response.applied_fixes)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Context-enhanced improvement failed: {str(e)}")
+
+@app.post("/repo/context-summary") 
+async def get_repository_context_summary(request: dict):
+    """
+    Get a concise repository context summary optimized for AI prompts.
+    
+    Returns a formatted context summary that can be directly used
+    to enhance AI prompts with repository-specific information.
+    """
+    try:
+        repo_url = request.get("repo_url")
+        github_token = request.get("github_token")
+        
+        if not repo_url:
+            raise HTTPException(status_code=400, detail="Repository URL is required")
+        
+        # Initialize GitHub context provider  
+        github_provider = get_repo_context_provider(github_token)
+        
+        # Get repository information
+        repo_info = github_provider.get_repository_info(repo_url)
+        
+        if not repo_info:
+            return {
+                "status": "not_found",
+                "context_summary": "",
+                "context_available": False,
+                "error": "Repository not found or not accessible"
+            }
+        
+        # Generate AI-optimized context summary
+        context_summary = github_provider.generate_context_summary(repo_info)
+        
+        return {
+            "status": "success", 
+            "context_summary": context_summary,
+            "context_available": True,
+            "repository_info": {
+                "framework": repo_info.framework,
+                "language": repo_info.language,
+                "topics": repo_info.topics,
+                "dependency_count": len(repo_info.dependencies)
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "context_summary": "",
+            "context_available": False,
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     # Run the application - optimized for both development and Cloud Run
     environment = os.environ.get("ENVIRONMENT", "development")

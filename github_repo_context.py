@@ -48,8 +48,10 @@ class GitHubRepoContextProvider:
         
         if self.github_token:
             self.session.headers.update({
-                'Authorization': f'token {self.github_token}',
-                'Accept': 'application/vnd.github.v3+json'
+                'Authorization': f'Bearer {self.github_token}',
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+                'User-Agent': 'CodeGuard-API/1.0'
             })
     
     def extract_repo_info_from_url(self, repo_url: str) -> Tuple[str, str]:
@@ -114,17 +116,34 @@ class GitHubRepoContextProvider:
             return None
     
     def _get_repo_basic_info(self, owner: str, repo_name: str) -> Optional[Dict]:
-        """Get basic repository information."""
+        """Get basic repository information with enhanced error handling."""
         try:
             url = f"{self.base_url}/repos/{owner}/{repo_name}"
-            response = self.session.get(url)
+            response = self.session.get(url, timeout=30)
             
             if response.status_code == 404:
+                logger.warning(f"Repository {owner}/{repo_name} not found")
+                return None
+            elif response.status_code == 403:
+                logger.warning(f"Access forbidden to {owner}/{repo_name} - may be private or rate limited")
+                return None
+            elif response.status_code == 401:
+                logger.warning("GitHub authentication failed - check API token")
                 return None
             
             response.raise_for_status()
-            return response.json()
+            repo_data = response.json()
             
+            # Check rate limits
+            remaining = response.headers.get('X-RateLimit-Remaining', '0')
+            if int(remaining) < 10:
+                logger.warning(f"GitHub API rate limit low: {remaining} requests remaining")
+            
+            return repo_data
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout fetching repo info for {owner}/{repo_name}")
+            return None
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching repo basic info: {e}")
             return None
@@ -150,43 +169,75 @@ class GitHubRepoContextProvider:
             logger.error(f"Error fetching README: {e}")
             return ""
     
-    def _get_file_structure(self, owner: str, repo_name: str, max_depth: int = 3) -> Dict[str, Any]:
-        """Get repository file structure."""
+    def _get_file_structure(self, owner: str, repo_name: str, max_depth: int = 2) -> Dict[str, Any]:
+        """Get repository file structure using GitHub Trees API."""
         try:
-            def get_tree_recursive(path: str = "", depth: int = 0) -> Dict[str, Any]:
-                if depth >= max_depth:
-                    return {}
+            # Use Git Trees API for more efficient tree traversal
+            url = f"{self.base_url}/repos/{owner}/{repo_name}/git/trees/HEAD"
+            response = self.session.get(url, params={'recursive': '1'})
+            
+            if response.status_code != 200:
+                # Fallback to contents API for root directory
+                return self._get_contents_fallback(owner, repo_name)
+            
+            tree_data = response.json()
+            structure = {}
+            
+            # Build hierarchical structure from flat tree
+            for item in tree_data.get('tree', []):
+                path_parts = item['path'].split('/')
+                if len(path_parts) > max_depth:
+                    continue
                 
-                url = f"{self.base_url}/repos/{owner}/{repo_name}/contents/{path}"
-                response = self.session.get(url)
-                
-                if response.status_code != 200:
-                    return {}
-                
-                contents = response.json()
-                if not isinstance(contents, list):
-                    return {}
-                
-                structure = {}
-                for item in contents[:20]:  # Limit to first 20 items per directory
-                    name = item['name']
-                    if item['type'] == 'dir':
-                        structure[name] = {
-                            'type': 'directory',
-                            'children': get_tree_recursive(item['path'], depth + 1)
+                current = structure
+                for i, part in enumerate(path_parts):
+                    if i == len(path_parts) - 1:
+                        # Leaf node
+                        current[part] = {
+                            'type': 'file' if item['type'] == 'blob' else 'directory',
+                            'size': item.get('size', 0) if item['type'] == 'blob' else None,
+                            'sha': item.get('sha')
                         }
                     else:
-                        structure[name] = {
-                            'type': 'file',
-                            'size': item.get('size', 0)
-                        }
-                
-                return structure
+                        # Directory node
+                        if part not in current:
+                            current[part] = {
+                                'type': 'directory',
+                                'children': {}
+                            }
+                        current = current[part].setdefault('children', {})
             
-            return get_tree_recursive()
+            return structure
             
         except Exception as e:
-            logger.error(f"Error fetching file structure: {e}")
+            logger.error(f"Error fetching file structure with Trees API: {e}")
+            return self._get_contents_fallback(owner, repo_name)
+    
+    def _get_contents_fallback(self, owner: str, repo_name: str) -> Dict[str, Any]:
+        """Fallback method using Contents API."""
+        try:
+            url = f"{self.base_url}/repos/{owner}/{repo_name}/contents/"
+            response = self.session.get(url)
+            
+            if response.status_code != 200:
+                return {}
+            
+            contents = response.json()
+            if not isinstance(contents, list):
+                return {}
+            
+            structure = {}
+            for item in contents[:15]:  # Limit items for performance
+                name = item['name']
+                structure[name] = {
+                    'type': 'file' if item['type'] == 'file' else 'directory',
+                    'size': item.get('size', 0) if item['type'] == 'file' else None
+                }
+            
+            return structure
+            
+        except Exception as e:
+            logger.error(f"Error with contents fallback: {e}")
             return {}
     
     def _get_package_files(self, owner: str, repo_name: str) -> Dict[str, str]:
