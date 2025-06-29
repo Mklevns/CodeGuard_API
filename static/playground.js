@@ -419,46 +419,81 @@ def evaluate_model():
     }
 
     displayResults(data, hasImprovedCode = false) {
-        // Update summary
-        document.getElementById('issueCount').textContent = data.issues?.length || 0;
-        document.getElementById('fixCount').textContent = data.fixes?.length || 0;
-        document.getElementById('summaryPanel').classList.remove('hidden');
+        try {
+            // Ensure data is valid
+            if (!data || typeof data !== 'object') {
+                console.warn('Invalid data provided to displayResults:', data);
+                return;
+            }
 
-        // Show confidence score if available
-        if (data.confidence_score !== undefined) {
-            document.getElementById('confidence').textContent = Math.round(data.confidence_score * 100);
-            document.getElementById('confidenceScore').classList.remove('hidden');
+            // Update summary with null safety
+            const issueCountEl = document.getElementById('issueCount');
+            const fixCountEl = document.getElementById('fixCount');
+            const summaryPanelEl = document.getElementById('summaryPanel');
+            
+            if (issueCountEl) issueCountEl.textContent = data.issues?.length || 0;
+            if (fixCountEl) fixCountEl.textContent = data.fixes?.length || 0;
+            if (summaryPanelEl) summaryPanelEl.classList.remove('hidden');
+
+            // Show confidence score if available
+            if (data.confidence_score !== undefined) {
+                const confidenceEl = document.getElementById('confidence');
+                const confidenceScoreEl = document.getElementById('confidenceScore');
+                if (confidenceEl) confidenceEl.textContent = Math.round(data.confidence_score * 100);
+                if (confidenceScoreEl) confidenceScoreEl.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error in displayResults:', error);
         }
 
-        // Display frameworks
-        if (data.frameworks && data.frameworks.length > 0) {
+        // Display frameworks with error handling
+        if (data.frameworks && Array.isArray(data.frameworks) && data.frameworks.length > 0) {
             const frameworkList = document.getElementById('frameworkList');
-            frameworkList.innerHTML = '';
-            data.frameworks.forEach(framework => {
-                const badge = document.createElement('span');
-                badge.className = 'px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full';
-                badge.textContent = framework;
-                frameworkList.appendChild(badge);
-            });
-            document.getElementById('frameworkPanel').classList.remove('hidden');
+            const frameworkPanel = document.getElementById('frameworkPanel');
+            
+            if (frameworkList && frameworkPanel) {
+                frameworkList.innerHTML = '';
+                data.frameworks.forEach(framework => {
+                    if (framework) {
+                        const badge = document.createElement('span');
+                        badge.className = 'px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full';
+                        badge.textContent = String(framework);
+                        frameworkList.appendChild(badge);
+                    }
+                });
+                frameworkPanel.classList.remove('hidden');
+            }
         }
 
         // Display issues
         this.displayIssues(data.issues || [], data.fixes || []);
 
-        // Display improved code if available
+        // Display improved code if available with error handling
         if (hasImprovedCode && data.improved_code) {
-            document.getElementById('improvedCode').textContent = data.improved_code;
-            
-            // Defer syntax highlighting to avoid blocking UI
-            if (window.requestIdleCallback) {
-                requestIdleCallback(() => {
-                    Prism.highlightElement(document.getElementById('improvedCode'));
-                });
-            } else {
-                setTimeout(() => {
-                    Prism.highlightElement(document.getElementById('improvedCode'));
-                }, 16);
+            const improvedCodeEl = document.getElementById('improvedCode');
+            if (improvedCodeEl) {
+                improvedCodeEl.textContent = data.improved_code;
+                
+                // Defer syntax highlighting to avoid blocking UI
+                if (window.Prism && window.Prism.highlightElement) {
+                    if (window.requestIdleCallback) {
+                        requestIdleCallback(() => {
+                            try {
+                                Prism.highlightElement(improvedCodeEl);
+                            } catch (error) {
+                                console.warn('Syntax highlighting failed:', error);
+                            }
+                        });
+                    } else {
+                        setTimeout(() => {
+                            try {
+                                Prism.highlightElement(improvedCodeEl);
+                            } catch (error) {
+                                console.warn('Syntax highlighting failed:', error);
+                            }
+                        }, 16);
+                    }
+                }
             }
         }
 
@@ -470,8 +505,13 @@ def evaluate_model():
 
     displayIssues(issues, fixes) {
         const issuesList = document.getElementById('issuesList');
+        
+        if (!issuesList) {
+            console.error('Issues list element not found');
+            return;
+        }
 
-        if (issues.length === 0) {
+        if (!Array.isArray(issues) || issues.length === 0) {
             issuesList.innerHTML = '<p class="text-green-600 font-medium">No issues found! Your code looks good.</p>';
             return;
         }
