@@ -19,12 +19,12 @@ class DeepSeekKeepAliveHandler:
     def call_with_keepalive_handling(self, prompt: str, model: str = "deepseek-chat", 
                                    timeout: int = 45) -> str:
         """
-        Call DeepSeek API with proper keep-alive handling and timeout reset.
+        Call DeepSeek API using OpenAI-compatible format as per official docs.
         
         Args:
             prompt: The prompt to send
             model: DeepSeek model to use
-            timeout: Base timeout in seconds (resets on keep-alive)
+            timeout: Timeout in seconds
             
         Returns:
             Clean JSON response string
@@ -32,35 +32,27 @@ class DeepSeekKeepAliveHandler:
         if not self.api_key:
             raise Exception("DeepSeek API key not provided")
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.1,
-            "max_tokens": 4000
-        }
-        
+        # Use OpenAI client with DeepSeek endpoint as per official docs
         try:
-            # Use streaming to properly handle keep-alive messages
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=None,  # We'll handle timeout manually
-                stream=True
+            from openai import OpenAI
+            
+            client = OpenAI(
+                api_key=self.api_key,
+                base_url="https://api.deepseek.com"
             )
             
-            response.raise_for_status()
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.1,
+                max_tokens=4000,
+                timeout=timeout
+            )
             
-            # Handle the response with proper timeout and keep-alive management
-            return self._parse_streaming_response_with_keepalive(response, timeout)
+            return response.choices[0].message.content
             
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             raise Exception(f"DeepSeek API request failed: {str(e)}")
     
     def _parse_streaming_response_with_keepalive(self, response: requests.Response, timeout: int) -> str:

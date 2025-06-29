@@ -1363,15 +1363,25 @@ async def quick_fix_code(request: dict):
         from models import Issue
         mock_issues = []
         for issue_type in issue_types:
-            if issue_type == "security" and ("pickle.load" in original_code or "eval(" in original_code):
-                mock_issues.append(Issue(
-                    filename=filename,
-                    line=1,
-                    type="security",
-                    description="Security vulnerability detected",
-                    source="quick_fix",
-                    severity="error"
-                ))
+            if issue_type == "security":
+                if "pickle.load(" in original_code:
+                    mock_issues.append(Issue(
+                        filename=filename,
+                        line=1,
+                        type="security",
+                        description="Use of pickle.load() poses security risk",
+                        source="quick_fix",
+                        severity="error"
+                    ))
+                if "eval(" in original_code:
+                    mock_issues.append(Issue(
+                        filename=filename,
+                        line=1,
+                        type="security",
+                        description="Use of eval() poses security risk",
+                        source="quick_fix",
+                        severity="error"
+                    ))
             elif issue_type == "imports" and ("import " in original_code):
                 mock_issues.append(Issue(
                     filename=filename,
