@@ -35,15 +35,20 @@
         .tab-btn {
             @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300;
         }
-        /* Ensure button text is always visible */
+        /* Ensure all buttons are visible with proper contrast */
         button {
-            color: inherit !important;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
         }
         button.bg-orange-600, 
         button.bg-blue-600, 
         button.bg-green-600, 
-        button.bg-purple-600 {
+        button.bg-purple-600,
+        button.bg-indigo-600 {
             color: white !important;
+            opacity: 1 !important;
+            visibility: visible !important;
         }
     </style>
 </head>

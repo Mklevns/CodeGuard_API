@@ -47,9 +47,17 @@ class FalsePositiveFilter:
         
         try:
             # Step 1: Apply semantic analysis for intelligent filtering
-            semantic_filtered_issues, semantic_filtered_fixes = self._semantic_filter.filter_with_semantics(
-                issues, fixes, code_files
-            )
+            from semantic_analyzer import SemanticContext, create_semantic_context
+            
+            # Create semantic context from first code file
+            if code_files:
+                semantic_context = create_semantic_context(code_files[0].content, code_files[0].filename)
+                semantic_filtered_issues = self._semantic_filter.filter_issues(issues, semantic_context)
+            else:
+                semantic_filtered_issues = issues
+            
+            # Keep corresponding fixes for remaining issues
+            semantic_filtered_fixes = [fix for fix in fixes if any(issue.line == fix.line for issue in semantic_filtered_issues)]
             
             # Step 2: Apply fast rule-based filtering for common false positives
             final_filtered_issues = []
