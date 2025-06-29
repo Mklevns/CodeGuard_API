@@ -18,7 +18,7 @@ from github_repo_context import get_repo_context_provider
 from llm_prompt_generator import get_llm_prompt_generator
 from multi_ai_integration import get_multi_ai_manager
 from ml_performance_heatmap import heatmap_api, HeatmapConfig
-from git_analyzer import analyze_git_history
+from git_analyzer import analyze_git_history, GitContextRetriever
 from graph_analyzer import analyze_repository_structure
 import uuid
 import time
@@ -40,8 +40,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize project generator
+# Initialize project generator and Git context retriever
 project_generator = MLProjectGenerator()
+git_context_retriever = GitContextRetriever()
 
 # Mount static files for the playground
 app.mount("/static", StaticFiles(directory="static"), name="static")

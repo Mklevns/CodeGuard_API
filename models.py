@@ -1,10 +1,11 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 class CodeFile(BaseModel):
     """Represents a single code file to be analyzed."""
     filename: str = Field(description="Name of the file", examples=["train.py"])
     content: str = Field(description="Content of the file", examples=["import torch\n\n# TODO: training code"])
+    related_files: Optional[Dict[str, str]] = Field(default=None, description="Content of related files for enhanced context")
 
 class AuditOptions(BaseModel):
     """Optional configuration for the audit process."""

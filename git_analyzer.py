@@ -46,6 +46,186 @@ class FileMetrics:
     risk_score: float
 
 
+class GitContextRetriever:
+    """Retrieves Git context for enhanced code analysis and AI improvements."""
+    
+    def __init__(self, repo_path: str = "."):
+        self.repo_path = repo_path
+        self.repo = None
+        
+        if GIT_AVAILABLE:
+            try:
+                self.repo = Repo(repo_path, search_parent_directories=True)
+            except Exception:
+                self.repo = None
+    
+    def is_available(self) -> bool:
+        """Check if Git repository is available."""
+        return GIT_AVAILABLE and self.repo is not None and not self.repo.bare
+    
+    def get_related_files(self, file_path: str, limit: int = 5) -> List[str]:
+        """
+        Find files that are frequently co-changed with the given file.
+        
+        Args:
+            file_path: Path to the file to find related files for
+            limit: Maximum number of related files to return
+            
+        Returns:
+            List of file paths that are frequently changed together
+        """
+        if not self.is_available():
+            return []
+        
+        try:
+            # Get commit history for the file
+            commits = list(self.repo.iter_commits(paths=file_path, max_count=100))
+            if not commits:
+                return []
+            
+            # Find co-changed files with frequency scoring
+            related_files = {}
+            for commit in commits:
+                try:
+                    # Get all files changed in this commit
+                    changed_files = commit.stats.files.keys()
+                    for other_file in changed_files:
+                        if other_file != file_path and other_file.endswith('.py'):
+                            # Weight recent commits more heavily
+                            age_weight = 1.0
+                            if hasattr(commit, 'committed_date'):
+                                days_old = (datetime.now().timestamp() - commit.committed_date) / 86400
+                                age_weight = max(0.1, 1.0 - (days_old / 365))  # Decay over a year
+                            
+                            related_files[other_file] = related_files.get(other_file, 0) + age_weight
+                except Exception:
+                    continue
+            
+            # Sort by co-change frequency and return top results
+            sorted_files = sorted(related_files.items(), key=lambda x: x[1], reverse=True)
+            return [file for file, score in sorted_files[:limit]]
+            
+        except Exception:
+            return []
+    
+    def get_file_dependencies(self, file_path: str) -> List[str]:
+        """
+        Find files that this file depends on through imports.
+        
+        Args:
+            file_path: Path to the file to analyze
+            
+        Returns:
+            List of file paths that are imported by the given file
+        """
+        dependencies = []
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            import ast
+            import os
+            
+            try:
+                tree = ast.parse(content)
+                
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        for alias in node.names:
+                            dep_path = self._resolve_import_to_file(alias.name)
+                            if dep_path:
+                                dependencies.append(dep_path)
+                    elif isinstance(node, ast.ImportFrom):
+                        if node.module:
+                            dep_path = self._resolve_import_to_file(node.module)
+                            if dep_path:
+                                dependencies.append(dep_path)
+                                
+            except SyntaxError:
+                # If we can't parse, skip dependency analysis
+                pass
+                
+        except Exception:
+            pass
+        
+        return list(set(dependencies))  # Remove duplicates
+    
+    def _resolve_import_to_file(self, module_name: str) -> Optional[str]:
+        """
+        Try to resolve an import statement to a local file path.
+        
+        Args:
+            module_name: Name of the imported module
+            
+        Returns:
+            File path if found locally, None otherwise
+        """
+        # Simple heuristic for local files
+        possible_paths = [
+            f"{module_name}.py",
+            f"{module_name}/__init__.py",
+            f"{module_name.replace('.', '/')}.py",
+            f"{module_name.replace('.', '/')}/__init__.py"
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                return path
+        
+        return None
+    
+    def get_comprehensive_context(self, file_path: str, max_files: int = 5) -> Dict[str, str]:
+        """
+        Get comprehensive context for a file including co-changed files and dependencies.
+        
+        Args:
+            file_path: Path to the file to get context for
+            max_files: Maximum number of context files to return
+            
+        Returns:
+            Dictionary mapping file paths to their content
+        """
+        context = {}
+        
+        # Get co-changed files (higher priority)
+        co_changed = self.get_related_files(file_path, limit=max_files // 2 + 1)
+        
+        # Get dependency files
+        dependencies = self.get_file_dependencies(file_path)
+        
+        # Combine and prioritize
+        all_candidates = []
+        
+        # Co-changed files get higher priority
+        for i, file in enumerate(co_changed):
+            all_candidates.append((file, 10 - i))  # Higher score for earlier files
+        
+        # Dependencies get medium priority
+        for file in dependencies:
+            if file not in [f for f, _ in all_candidates]:
+                all_candidates.append((file, 5))
+        
+        # Sort by priority and take top files
+        all_candidates.sort(key=lambda x: x[1], reverse=True)
+        selected_files = [f for f, _ in all_candidates[:max_files]]
+        
+        # Read content for selected files
+        for related_file in selected_files:
+            try:
+                if os.path.exists(related_file):
+                    with open(related_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        # Limit content size to avoid overwhelming the AI
+                        if len(content) > 5000:
+                            content = content[:5000] + "\n... (truncated)"
+                        context[related_file] = content
+            except Exception:
+                continue
+        
+        return context
+
+
 class GitHistoryAnalyzer:
     """Analyzes Git repository history to identify patterns and trends."""
     

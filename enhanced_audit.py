@@ -17,6 +17,7 @@ from rl_environment_plugin import rl_env_analyzer, rl_config_analyzer
 from false_positive_filter import get_false_positive_filter
 from semantic_analyzer import analyze_code_semantically, SemanticFalsePositiveFilter
 from graph_analyzer import analyze_repository_structure
+from git_analyzer import GitContextRetriever
 
 
 class EnhancedAuditEngine:
@@ -26,6 +27,7 @@ class EnhancedAuditEngine:
         self.ml_rl_engine = MLRLRuleEngine()
         self.custom_rule_engine = CustomRuleEngine()
         self.use_false_positive_filter = use_false_positive_filter
+        self.git_context_retriever = GitContextRetriever()
         self.tools = {
             'flake8': self._run_flake8,
             'pylint': self._run_pylint,

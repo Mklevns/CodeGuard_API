@@ -1,0 +1,226 @@
+Of course. Here is a detailed guide on how to implement the expanded GitHub repository context analysis into the `CodeGuard` codebase, focusing on feeding related code context to the LLM for more intelligent code improvements.
+
+### 1\. Create a Git Context Retriever (`git_analyzer.py`)
+
+First, you'll need a module to interact with the Git repository and retrieve the relevant context.
+
+  * **Key Libraries to Use**: `GitPython`
+  * **New File to Create**: `git_analyzer.py`
+
+**Implementation Steps**:
+
+1.  **Update `pyproject.toml`**: Add `GitPython` to your project's dependencies.
+
+2.  **Create `git_analyzer.py`**: This module will contain a `GitAnalyzer` class responsible for finding related files.
+
+    ```python
+    # git_analyzer.py
+    import git
+    from typing import List, Optional
+
+    class GitAnalyzer:
+        def __init__(self, repo_path: str):
+            try:
+                self.repo = git.Repo(repo_path, search_parent_directories=True)
+            except git.InvalidGitRepositoryError:
+                self.repo = None
+
+        def get_related_files(self, file_path: str, limit: int = 3) -> List[str]:
+            """
+            Finds files that are frequently co-changed with the given file.
+            """
+            if not self.repo:
+                return []
+
+            try:
+                # Get the commit history for the file
+                commits = list(self.repo.iter_commits(paths=file_path, max_count=50))
+                if not commits:
+                    return []
+
+                # Find co-changed files
+                related_files = {}
+                for commit in commits:
+                    for other_file in commit.stats.files:
+                        if other_file != file_path:
+                            related_files[other_file] = related_files.get(other_file, 0) + 1
+
+                # Sort by co-change frequency
+                sorted_files = sorted(related_files.items(), key=lambda item: item[1], reverse=True)
+                return [file for file, count in sorted_files[:limit]]
+            except Exception:
+                return []
+    ```
+
+### 2\. Integrate Git Context into the Audit Workflow
+
+Next, you'll integrate the `GitAnalyzer` into the main audit workflow to retrieve the context for each file.
+
+  * **File to Modify**: `enhanced_audit.py`
+
+**Implementation Steps**:
+
+1.  **Import the `GitAnalyzer`**:
+
+    ```python
+    # enhanced_audit.py
+    from git_analyzer import GitAnalyzer
+    ```
+
+2.  **Instantiate the `GitAnalyzer`**: In the `EnhancedAuditEngine`'s `analyze_code` method, instantiate the `GitAnalyzer`.
+
+3.  **Retrieve Context for Each File**: For each file being audited, call the `GitAnalyzer` to get a list of related files.
+
+    ```python
+    # enhanced_audit.py
+
+    class EnhancedAuditEngine:
+        # ... (existing code) ...
+
+        def analyze_code(self, request: AuditRequest) -> AuditResponse:
+            # ... (existing code) ...
+
+            # Instantiate the GitAnalyzer
+            # Assuming the project is run from the root of the repo
+            git_analyzer = GitAnalyzer(".")
+
+            # Attach related files context to each file object
+            for file in request.files:
+                related_files_paths = git_analyzer.get_related_files(file.filename)
+                related_files_content = {}
+                for related_path in related_files_paths:
+                    try:
+                        with open(related_path, 'r') as f:
+                            related_files_content[related_path] = f.read()
+                    except (IOError, UnicodeDecodeError):
+                        # Handle cases where the file might be binary or unreadable
+                        pass
+                # A new attribute to hold the context
+                file.related_files = related_files_content
+            
+            # ... (the rest of the analysis logic) ...
+    ```
+
+    *Note*: You'll need to add a `related_files` attribute to the `CodeFile` model in `models.py`.
+
+### 3\. Enhance the LLM Prompt
+
+This is the most critical step. You'll modify the prompt sent to the LLM to include the new context.
+
+  * **File to Modify**: `chatgpt_integration.py`
+
+**Implementation Steps**:
+
+1.  **Modify `_build_improvement_prompt`**: This function should be updated to accept the `related_files` context and incorporate it into the prompt.
+
+    ```python
+    # chatgpt_integration.py
+
+    def _build_improvement_prompt(self, request: CodeImprovementRequest) -> str:
+        issues_summary = self._format_issues_for_prompt(request.issues)
+        fixes_summary = self._format_fixes_for_prompt(request.fixes)
+
+        # Prepare the related files context for the prompt
+        related_files_context = ""
+        if hasattr(request, 'related_files') and request.related_files:
+            related_files_context += "\n\n**Related Files Context:**\n"
+            related_files_context += "Here is the content of files that are frequently changed with this one. Use them to inform your suggestions.\n"
+            for filename, content in request.related_files.items():
+                related_files_context += f"\n--- Start of {filename} ---\n"
+                related_files_context += content
+                related_files_context += f"\n--- End of {filename} ---\n"
+
+        prompt = f"""
+    ```
+
+Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not create a generic example.
+
+**CRITICAL: You must improve the provided code, not write a new example.**
+
+**Original Code to Fix ({request.filename}):**
+
+```python
+{request.original_code}
+```
+
+{related\_files\_context}
+**Specific Issues to Fix:**
+{issues\_summary}
+
+**Specific Fixes to Apply:**
+{fixes\_summary}
+
+**Requirements:**
+
+1.  Start with the EXACT original code above.
+2.  Use the provided "Related Files Context" to ensure your suggestions are consistent with the project's overall architecture and style.
+3.  Apply ONLY the specific fixes listed by CodeGuard.
+4.  Keep the original function names, structure, and logic.
+5.  Do not add new functions unless fixing undefined variables.
+6.  Preserve the original code's behavior and intent.
+7.  Fix security issues (pickle → json), add missing seeding, replace print → logging.
+8.  Remove unused imports, fix formatting only as specified.
+
+**Return JSON with:**
+
+  - "improved\_code": The original code with ONLY the listed fixes applied
+  - "applied\_fixes": List describing what was actually changed in the original code
+  - "improvement\_summary": Summary of fixes applied to the original code
+  - "confidence\_score": Float 0-1
+  - "warnings": Any considerations about the fixes
+    """
+    return prompt
+    ```
+    
+    ```
+
+### 4\. Update the API Endpoint and Models
+
+Finally, you need to update the API to handle the new context.
+
+  * **Files to Modify**: `main.py`, `models.py`
+
+**Implementation Steps**:
+
+1.  **Modify `models.py`**: Add the `related_files` attribute to the `CodeFile` model.
+
+    ```python
+    # models.py
+    from typing import Dict, Any
+
+    class CodeFile(BaseModel):
+        filename: str = Field(description="Name of the file", examples=["train.py"])
+        content: str = Field(description="Content of the file", examples=["import torch\n\n# TODO: training code"])
+        related_files: Optional[Dict[str, Any]] = Field(default=None, description="Content of related files")
+    ```
+
+2.  **Modify `main.py`**: Update the `/improve/code` endpoint to accept an optional parameter to control this feature.
+
+    ```python
+    # main.py
+
+    @app.post("/improve/code")
+    async def improve_code_with_ai(request: dict, include_git_context: bool = True):
+        # ... (existing code) ...
+
+        # The `enhanced_audit.py` will now automatically add the context if `include_git_context` is True.
+        # You may need to pass this flag down to the analysis engine.
+
+        # ... (the rest of the logic) ...
+    ```
+
+### Example: Before and After
+
+Here's how this would improve the quality of the LLM's suggestions:
+
+**Scenario**: A file `data_loader.py` has a function that processes data. The LLM is asked to improve it.
+
+**Without Git Context (Before)**: The LLM only sees `data_loader.py` and might suggest a generic improvement that doesn't align with how the data is used elsewhere in the project. For example, it might change the output format of a data processing function, which would break the code in `train.py` that calls it.
+
+**With Git Context (After)**: The LLM is provided with the content of `train.py` and `model.py` because they are frequently changed with `data_loader.py`.
+
+  * **More Accurate Refactoring**: The LLM sees how the data from `data_loader.py` is consumed in `train.py` and can make changes that are compatible with the rest of the project.
+  * **Better Architectural Consistency**: The LLM can see the existing design patterns in the related files and suggest improvements that are consistent with them.
+  * **Reduced Risk of Breaking Changes**: By understanding the dependencies, the LLM is less likely to suggest changes that would introduce bugs in other parts of the codebase.
+
+By implementing these changes, you can leverage the full context of the Git repository to provide more intelligent, context-aware, and reliable code improvements to your users.
