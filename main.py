@@ -4,18 +4,18 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
-from src.codeguard.core.models import AuditRequest, AuditResponse
-from src.codeguard.analysis.audit import analyze_code
-from src.codeguard.core.auth import verify_api_key, get_current_user
-from src.codeguard.analysis.rule_loader import CustomRuleEngine
-from src.codeguard.utils.telemetry import telemetry_collector, metrics_analyzer
-from src.codeguard.utils.dashboard import get_dashboard
-from src.codeguard.utils.historical_timeline import get_timeline_generator
-from src.codeguard.utils.gpt_connector import get_gpt_connector, get_issue_explainer
-from src.codeguard.templates.project_templates import MLProjectGenerator
-from src.codeguard.analysis.chatgpt_integration import get_code_improver, get_batch_improver, CodeImprovementRequest
-from src.codeguard.analysis.multi_ai_integration import get_multi_ai_manager
-from src.codeguard.utils.ml_performance_heatmap import heatmap_api, HeatmapConfig
+from models import AuditRequest, AuditResponse
+from audit import analyze_code
+from auth import verify_api_key, get_current_user
+from rule_loader import CustomRuleEngine
+from telemetry import telemetry_collector, metrics_analyzer
+from dashboard import get_dashboard
+from historical_timeline import get_timeline_generator
+from gpt_connector import get_gpt_connector, get_issue_explainer
+from project_templates import MLProjectGenerator
+from chatgpt_integration import get_code_improver, get_batch_improver, CodeImprovementRequest
+from multi_ai_integration import get_multi_ai_manager
+from ml_performance_heatmap import heatmap_api, HeatmapConfig
 import uuid
 import time
 
