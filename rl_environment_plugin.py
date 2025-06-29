@@ -100,29 +100,18 @@ class RLEnvironmentAnalyzer:
                     filename=filename,
                     line=i + 1,
                     type="warning",
-                    description="Reward clipping detected - verify this doesn't mask important reward signals",
-                    source="rl_plugin", 
+                    description="Reward clipping detected - ensure reward scaling is appropriate for your RL algorithm",
+                    source="rl_plugin",
                     severity="warning"
                 ))
             
-            # Check for hardcoded reward values that might indicate saturation
-            elif re.search(r'reward\s*=\s*[+-]?\d+\.?\d*\s*$', line):
+            # Check for potential reward explosion
+            if re.search(r'reward\s*\*=|reward\s*=.*reward\s*\*', line):
                 issues.append(Issue(
                     filename=filename,
                     line=i + 1,
-                    type="best_practice",
-                    description="Reward clipping detected - ensure this doesn't mask important reward signals",
-                    source="rl_plugin",
-                    severity="info"
-                ))
-            
-            # Check for hardcoded reward values
-            if re.search(r'reward\s*=\s*[0-9]+\.?[0-9]*$', line.strip()):
-                issues.append(Issue(
-                    filename=filename,
-                    line=i + 1,
-                    type="best_practice",
-                    description="Hardcoded reward value - consider making rewards configurable",
+                    type="warning", 
+                    description="Multiplicative reward modification detected - may cause reward explosion",
                     source="rl_plugin",
                     severity="warning"
                 ))
@@ -134,18 +123,225 @@ class RLEnvironmentAnalyzer:
         issues = []
         
         for i, line in enumerate(lines):
-            # Look for action sampling without checking action space
-            if re.search(r'action\s*=.*random|action\s*=.*choice', line):
-                # Check if action_space is referenced nearby
-                context_lines = lines[max(0, i-5):min(len(lines), i+5)]
-                context = '\n'.join(context_lines)
+            # Look for manual action construction without space validation
+            if re.search(r'action\s*=\s*\[.*\]|action\s*=.*np\.array', line):
+                # Check if action space is referenced nearby
+                space_check = False
+                for j in range(max(0, i-5), min(len(lines), i+5)):
+                    if 'action_space' in lines[j]:
+                        space_check = True
+                        break
                 
-                if 'action_space' not in context:
+                if not space_check:
                     issues.append(Issue(
                         filename=filename,
                         line=i + 1,
-                        type="best_practice",
-                        description="Random action generation without checking env.action_space - may cause invalid actions",
+                        type="warning",
+                        description="Manual action construction without action space validation - may cause environment errors",
+                        source="rl_plugin",
+                        severity="warning"
+                    ))
+        
+        return issues
+    
+    def _check_observation_handling(self, filename: str, content: str, lines: List[str]) -> List[Issue]:
+        """Check for observation handling issues."""
+        issues = []
+        
+        for i, line in enumerate(lines):
+            # Check for direct observation indexing without shape validation
+            if re.search(r'obs\[.*\]|observation\[.*\]', line):
+                issues.append(Issue(
+                    filename=filename,
+                    line=i + 1,
+                    type="info",
+                    description="Direct observation indexing - ensure observation space shape is validated",
+                    source="rl_plugin",
+                    severity="info"
+                ))
+            
+            # Check for observation normalization
+            if re.search(r'obs\s*/=|observation\s*/=', line):
+                issues.append(Issue(
+                    filename=filename,
+                    line=i + 1,
+                    type="info",
+                    description="Observation normalization detected - ensure consistent preprocessing",
+                    source="rl_plugin",
+                    severity="info"
+                ))
+        
+        return issues
+    
+    def _check_environment_lifecycle(self, filename: str, content: str, lines: List[str]) -> List[Issue]:
+        """Check for proper environment lifecycle management."""
+        issues = []
+        has_close = any(re.search(r'\.close\s*\(', line) for line in lines)
+        has_env_creation = any(re.search(r'gym\.make|env\s*=', line) for line in lines)
+        
+        if has_env_creation and not has_close:
+            issues.append(Issue(
+                filename=filename,
+                line=1,
+                type="warning",
+                description="Environment created but never closed - may cause resource leaks",
+                source="rl_plugin",
+                severity="warning"
+            ))
+        
+        return issues
+    
+    def _check_seed_handling(self, filename: str, content: str, lines: List[str]) -> List[Issue]:
+        """Check for proper seed handling in RL environments."""
+        issues = []
+        
+        has_env_seed = any(re.search(r'\.seed\s*\(', line) for line in lines)
+        has_env_creation = any(re.search(r'gym\.make', line) for line in lines)
+        
+        if has_env_creation and not has_env_seed:
+            issues.append(Issue(
+                filename=filename,
+                line=1,
+                type="warning",
+                description="Environment created without seeding - may affect reproducibility",
+                source="rl_plugin",
+                severity="warning"
+            ))
+        
+        return issues
+    
+    def _check_episode_termination(self, filename: str, content: str, lines: List[str]) -> List[Issue]:
+        """Check for proper episode termination handling."""
+        issues = []
+        
+        for i, line in enumerate(lines):
+            # Look for done flag usage
+            if re.search(r'if\s+done|while.*not.*done', line):
+                # Check if truncated flag is also handled (Gym 0.26+)
+                truncated_handled = False
+                for j in range(max(0, i-3), min(len(lines), i+3)):
+                    if 'truncated' in lines[j]:
+                        truncated_handled = True
+                        break
+                
+                if not truncated_handled:
+                    issues.append(Issue(
+                        filename=filename,
+                        line=i + 1,
+                        type="compatibility",
+                        description="Episode termination only checks 'done' flag - consider handling 'truncated' flag for Gym 0.26+ compatibility",
+                        source="rl_plugin",
+                        severity="info"
+                    ))
+        
+        return issues
+    
+    def _generate_rl_fixes(self, filename: str, issues: List[Issue]) -> List[Fix]:
+        """Generate fixes for RL-specific issues."""
+        fixes = []
+        
+        for issue in issues:
+            fix = None
+            
+            if "missing env.reset()" in issue.description:
+                fix = Fix(
+                    filename=filename,
+                    line_number=issue.line,
+                    description="Add environment reset at episode start",
+                    original_code="# Missing reset",
+                    fixed_code="obs = env.reset()  # Reset environment at episode start",
+                    diff_preview="+ obs = env.reset()  # Reset environment at episode start",
+                    auto_fixable=True
+                )
+            
+            elif "Environment created but never closed" in issue.description:
+                fix = Fix(
+                    filename=filename,
+                    line_number=issue.line,
+                    description="Add environment cleanup",
+                    original_code="# Missing cleanup",
+                    fixed_code="env.close()  # Clean up environment resources",
+                    diff_preview="+ env.close()  # Clean up environment resources",
+                    auto_fixable=True
+                )
+            
+            elif "without seeding" in issue.description:
+                fix = Fix(
+                    filename=filename,
+                    line_number=issue.line,
+                    description="Add environment seeding for reproducibility",
+                    original_code="# Missing seed",
+                    fixed_code="env.seed(42)  # Set seed for reproducibility",
+                    diff_preview="+ env.seed(42)  # Set seed for reproducibility",
+                    auto_fixable=True
+                )
+            
+            if fix:
+                fixes.append(fix)
+        
+        return fixes
+
+
+def rl_env_analyzer(filename: str, content: str) -> Tuple[List[Issue], List[Fix]]:
+    """Main function to analyze RL environment code."""
+    analyzer = RLEnvironmentAnalyzer()
+    return analyzer.analyze_environment_code(filename, content)
+
+
+def rl_config_analyzer(config_path: str) -> Tuple[List[Issue], List[Fix]]:
+    """Analyze RL configuration files (YAML, JSON)."""
+    issues = []
+    fixes = []
+    
+    try:
+        with open(config_path, 'r') as f:
+            if config_path.endswith('.yaml') or config_path.endswith('.yml'):
+                import yaml
+                config = yaml.safe_load(f)
+            elif config_path.endswith('.json'):
+                import json
+                config = json.load(f)
+            else:
+                return issues, fixes
+        
+        # Check for common RL hyperparameter issues
+        if isinstance(config, dict):
+            # Check for missing critical hyperparameters
+            rl_params = ['learning_rate', 'batch_size', 'gamma', 'epsilon']
+            missing_params = [param for param in rl_params if param not in config]
+            
+            if missing_params:
+                issues.append(Issue(
+                    filename=config_path,
+                    line=1,
+                    type="configuration",
+                    description=f"Missing RL hyperparameters: {', '.join(missing_params)}",
+                    source="rl_plugin",
+                    severity="warning"
+                ))
+            
+            # Check for potentially problematic values
+            if 'learning_rate' in config and config['learning_rate'] > 0.1:
+                issues.append(Issue(
+                    filename=config_path,
+                    line=1,
+                    type="configuration",
+                    description="Learning rate > 0.1 may be too high - consider reducing",
+                    source="rl_plugin", 
+                    severity="warning"
+                ))
+    
+    except Exception as e:
+        issues.append(Issue(
+            filename=config_path,
+            line=1,
+            type="error",
+            description=f"Failed to analyze configuration file: {str(e)}",
+            source="rl_plugin",
+            severity="warning"
+        ))
+    
+    return issues, fixes
                         source="rl_plugin",
                         severity="warning"
                     ))

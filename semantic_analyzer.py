@@ -389,26 +389,24 @@ def analyze_code_semantically(code_file: CodeFile) -> Tuple[SemanticContext, Lis
     for pattern in context.security_patterns:
         if pattern['type'] == 'dangerous_function':
             issue = Issue(
-                line_number=pattern['line'],
-                column_number=0,
-                rule_id='S001',
+                filename=code_file.filename,
+                line=pattern['line'],
+                type='security',
                 description=f"Security: {pattern['description']}",
                 severity='error',
-                source='semantic_analyzer',
-                code_line=analyzer.lines[pattern['line'] - 1] if pattern['line'] <= len(analyzer.lines) else ""
+                source='semantic_analyzer'
             )
             semantic_issues.append(issue)
     
     # Check for missing random seeds in ML code
     if _has_ml_imports(context) and not _has_random_seeding(context):
         issue = Issue(
-            line_number=1,
-            column_number=0,
-            rule_id='ML001',
+            filename=code_file.filename,
+            line=1,
+            type='reproducibility',
             description='Missing random seed for reproducibility in ML code',
             severity='warning',
-            source='semantic_analyzer',
-            code_line=analyzer.lines[0] if analyzer.lines else ""
+            source='semantic_analyzer'
         )
         semantic_issues.append(issue)
     
