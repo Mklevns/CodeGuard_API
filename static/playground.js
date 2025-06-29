@@ -62,6 +62,10 @@ class CodeGuardPlayground {
         document.getElementById('loadExample').addEventListener('click', () => this.loadExampleCode());
         document.getElementById('clearCode').addEventListener('click', () => this.clearCode());
 
+        // Repository context
+        document.getElementById('githubRepoUrl').addEventListener('input', () => this.validateRepoUrl());
+        document.getElementById('analyzeRepo').addEventListener('click', () => this.analyzeRepository());
+
         // Analysis buttons
         document.getElementById('auditBtn').addEventListener('click', () => this.auditCode());
         document.getElementById('improveBtn').addEventListener('click', () => this.improveCode());
@@ -232,21 +236,32 @@ def evaluate_model():
             const auditData = await auditResponse.json();
 
             // Then improve the code using AI
-            const improveResponse = await fetch(`${this.apiBaseUrl}/improve/code`, {
+            const improvePayload = {
+                original_code: code,
+                filename: filename,
+                issues: auditData.issues || [],
+                fixes: auditData.fixes || [],
+                improvement_level: 'moderate',
+                preserve_functionality: true,
+                ai_provider: aiProvider,
+                ai_api_key: apiKey
+            };
+
+            // Add repository context if available
+            if (this.repositoryContext) {
+                improvePayload.github_repo_url = this.repositoryContext.url;
+                if (this.repositoryContext.token) {
+                    improvePayload.github_token = this.repositoryContext.token;
+                }
+            }
+
+            const endpoint = this.repositoryContext ? '/improve/with-repo-context' : '/improve/code';
+            const improveResponse = await fetch(`${this.apiBaseUrl}${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    original_code: code,
-                    filename: filename,
-                    issues: auditData.issues || [],
-                    fixes: auditData.fixes || [],
-                    improvement_level: 'moderate',
-                    preserve_functionality: true,
-                    ai_provider: aiProvider,
-                    ai_api_key: apiKey
-                })
+                body: JSON.stringify(improvePayload)
             });
 
             if (!improveResponse.ok) {
@@ -294,24 +309,34 @@ def evaluate_model():
         this.showStatus('Running comprehensive analysis and AI improvement...');
 
         try {
+            const payload = {
+                files: [{
+                    filename: filename,
+                    content: code
+                }],
+                options: {
+                    level: document.getElementById('analysisLevel').value,
+                    framework: 'auto',
+                    target: 'gpu'
+                },
+                ai_provider: aiProvider,
+                ai_api_key: apiKey
+            };
+
+            // Add repository context if available
+            if (this.repositoryContext) {
+                payload.github_repo_url = this.repositoryContext.url;
+                if (this.repositoryContext.token) {
+                    payload.github_token = this.repositoryContext.token;
+                }
+            }
+
             const response = await fetch(`${this.apiBaseUrl}/audit-and-improve`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    files: [{
-                        filename: filename,
-                        content: code
-                    }],
-                    options: {
-                        level: document.getElementById('analysisLevel').value,
-                        framework: 'auto',
-                        target: 'gpu'
-                    },
-                    ai_provider: aiProvider,
-                    ai_api_key: apiKey
-                })
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -787,6 +812,117 @@ def evaluate_model():
         const originalText = btn.textContent;
         btn.textContent = 'Applied!';
         setTimeout(() => btn.textContent = originalText, 2000);
+    }
+
+    // Repository Context Methods
+    validateRepoUrl() {
+        const repoUrl = document.getElementById('githubRepoUrl').value.trim();
+        const analyzeBtn = document.getElementById('analyzeRepo');
+        
+        if (repoUrl && this.isValidGitHubUrl(repoUrl)) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+            analyzeBtn.disabled = true;
+            analyzeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    isValidGitHubUrl(url) {
+        const githubPattern = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/;
+        return githubPattern.test(url);
+    }
+
+    async analyzeRepository() {
+        const repoUrl = document.getElementById('githubRepoUrl').value.trim();
+        const githubToken = document.getElementById('githubToken').value.trim();
+        const statusEl = document.getElementById('repoStatus');
+        const repoInfoEl = document.getElementById('repoInfo');
+        const analyzeBtn = document.getElementById('analyzeRepo');
+
+        if (!repoUrl) return;
+
+        statusEl.innerHTML = '<span class="text-blue-600">Analyzing repository...</span>';
+        analyzeBtn.disabled = true;
+        
+        try {
+            const payload = { repo_url: repoUrl };
+            if (githubToken) {
+                payload.github_token = githubToken;
+            }
+
+            const response = await fetch(`${this.apiBaseUrl}/repo/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                statusEl.innerHTML = '<span class="text-green-600">✓ Repository analyzed successfully</span>';
+                this.displayRepositoryInfo(result);
+                
+                this.repositoryContext = {
+                    url: repoUrl,
+                    token: githubToken,
+                    info: result.repository,
+                    contextSummary: result.context_summary
+                };
+                
+            } else {
+                statusEl.innerHTML = '<span class="text-red-600">✗ Analysis failed: ' + (result.error || result.detail || 'Unknown error') + '</span>';
+                repoInfoEl.classList.add('hidden');
+            }
+
+        } catch (error) {
+            statusEl.innerHTML = '<span class="text-red-600">✗ Error: ' + error.message + '</span>';
+            repoInfoEl.classList.add('hidden');
+        } finally {
+            analyzeBtn.disabled = false;
+        }
+    }
+
+    displayRepositoryInfo(result) {
+        const repoInfoEl = document.getElementById('repoInfo');
+        const repoDetailsEl = document.getElementById('repoDetails');
+        const repo = result.repository;
+
+        repoDetailsEl.innerHTML = `
+            <div><strong>Repository:</strong> ${repo.owner}/${repo.name}</div>
+            <div><strong>Language:</strong> ${repo.language}</div>
+            <div><strong>Framework:</strong> ${repo.framework}</div>
+            <div><strong>Dependencies:</strong> ${repo.dependencies_count} packages</div>
+            ${repo.description ? `<div><strong>Description:</strong> ${repo.description}</div>` : ''}
+            ${repo.topics && repo.topics.length > 0 ? `<div><strong>Topics:</strong> ${repo.topics.join(', ')}</div>` : ''}
+            <div class="mt-2 text-xs">
+                <strong>Key Dependencies:</strong> ${repo.key_dependencies.slice(0, 5).join(', ')}
+                ${repo.key_dependencies.length > 5 ? ` and ${repo.key_dependencies.length - 5} more...` : ''}
+            </div>
+        `;
+
+        repoInfoEl.classList.remove('hidden');
+    }
+
+    showContextEnhancementNotice(result) {
+        const resultsEl = document.getElementById('resultsContent');
+        const contextNotice = document.createElement('div');
+        contextNotice.className = 'bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4';
+        contextNotice.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="font-medium text-blue-800">Repository Context Enhanced</span>
+            </div>
+            <p class="text-blue-700 text-sm mt-1">
+                AI suggestions improved using ${this.repositoryContext.info.framework} patterns and project-specific context
+            </p>
+            <div class="text-xs text-blue-600 mt-2">
+                Context-aware improvements applied with enhanced accuracy
+            </div>
+        `;
+        resultsEl.insertBefore(contextNotice, resultsEl.firstChild);
     }
 }
 
