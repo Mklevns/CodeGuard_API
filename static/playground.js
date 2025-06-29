@@ -58,14 +58,14 @@ class CodeGuardPlayground {
 
         safeAddEventListener('apiKey', 'input', (e) => {
             const rememberKeyEl = document.getElementById('rememberKey');
-            if (rememberKeyEl?.checked) {
+            if (rememberKeyEl && rememberKeyEl.checked) {
                 localStorage.setItem('codeguard_api_key', e.target.value);
             }
         });
 
         safeAddEventListener('aiProvider', 'change', (e) => {
             const rememberKeyEl = document.getElementById('rememberKey');
-            if (rememberKeyEl?.checked) {
+            if (rememberKeyEl && rememberKeyEl.checked) {
                 localStorage.setItem('codeguard_ai_provider', e.target.value);
             }
         });
