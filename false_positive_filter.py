@@ -47,7 +47,7 @@ class FalsePositiveFilter:
         
         try:
             # Step 1: Apply semantic analysis for intelligent filtering
-            from semantic_analyzer import SemanticContext, create_semantic_context
+            from semantic_analyzer import create_semantic_context
             
             # Create semantic context from first code file
             if code_files:

@@ -426,6 +426,12 @@ def _has_random_seeding(context: SemanticContext) -> bool:
     return any(call['name'] in seed_functions for call in context.function_calls)
 
 
+def create_semantic_context(code_content: str, filename: str = "main.py") -> SemanticContext:
+    """Create semantic context from code content."""
+    analyzer = SemanticAnalyzer(code_content, filename)
+    return analyzer.analyze()
+
+
 def get_semantic_analyzer() -> SemanticFalsePositiveFilter:
     """Get semantic analyzer instance."""
     return SemanticFalsePositiveFilter()
