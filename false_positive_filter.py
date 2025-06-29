@@ -1,6 +1,6 @@
 """
 False Positive Filter for CodeGuard API.
-Uses ChatGPT to validate issues before reporting them to prevent false positives.
+Uses semantic analysis and ChatGPT to validate issues before reporting them to prevent false positives.
 """
 
 import json
@@ -8,6 +8,7 @@ import os
 from typing import List, Dict, Any, Optional, Tuple
 from openai import OpenAI
 from models import Issue, Fix, CodeFile
+from semantic_analyzer import SemanticFalsePositiveFilter
 
 class FalsePositiveFilter:
     """Filters out false positive issues using ChatGPT analysis."""
