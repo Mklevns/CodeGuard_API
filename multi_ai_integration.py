@@ -42,7 +42,7 @@ class MultiAIManager:
                 original_key = os.environ.get("OPENAI_API_KEY")
                 os.environ["OPENAI_API_KEY"] = api_key
                 try:
-                    response = self.chatgpt_improver.improve_code(request)
+                    response = self.multi_llm_improver.improve_code(request)
                     response.applied_fixes.append({"provider": "openai", "custom_key": True})
                     return response
                 except Exception as e:
@@ -57,7 +57,7 @@ class MultiAIManager:
             else:
                 # Use existing configuration
                 try:
-                    response = self.chatgpt_improver.improve_code(request)
+                    response = self.multi_llm_improver.improve_code(request)
                     response.applied_fixes.append({"provider": "openai", "environment_key": True})
                     return response
                 except Exception as e:

@@ -132,7 +132,7 @@
         },
         "codeguard.aiProvider": {
           "type": "string",
-          "enum": ["openai", "gemini", "claude"],
+          "enum": ["openai", "deepseek", "gemini", "claude"],
           "description": "AI provider for code improvements and fixes.",
           "default": "openai"
         },
