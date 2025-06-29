@@ -628,6 +628,82 @@ async def apply_bulk_fixes(request: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bulk fix failed: {str(e)}")
 
+@app.post("/improve/fim-completion")
+async def fim_code_completion(request: dict) -> dict:
+    """DeepSeek FIM (Fill In the Middle) completion endpoint for targeted code improvements."""
+    try:
+        prefix = request.get("prefix", "")
+        suffix = request.get("suffix", "")
+        ai_provider = request.get("ai_provider", "deepseek")
+        ai_api_key = request.get("ai_api_key")
+        max_tokens = request.get("max_tokens", 2000)
+        
+        if not prefix:
+            raise HTTPException(status_code=400, detail="Prefix is required for FIM completion")
+        
+        if ai_provider.lower() != "deepseek":
+            raise HTTPException(status_code=400, detail="FIM completion currently only supports DeepSeek")
+        
+        # Use DeepSeek FIM completion
+        improver = get_code_improver()
+        
+        # Create a prompt that will trigger FIM completion
+        fim_prompt = f"```python\n{prefix}\n# TODO: Complete implementation\n{suffix}\n```"
+        
+        # Create a basic improvement request for FIM
+        improvement_request = CodeImprovementRequest(
+            original_code=fim_prompt,
+            filename="fim_completion.py",
+            issues=[],
+            fixes=[],
+            improvement_level="moderate",
+            ai_provider=ai_provider,
+            ai_api_key=ai_api_key
+        )
+        
+        # Call the FIM-enhanced DeepSeek integration
+        api_key = ai_api_key or os.getenv('DEEPSEEK_API_KEY')
+        if not api_key:
+            raise HTTPException(status_code=400, detail="DeepSeek API key required for FIM completion")
+            
+        response = improver._call_deepseek_fim_completion(fim_prompt, api_key)
+        
+        # Parse response
+        import json
+        try:
+            result = json.loads(response)
+            completed_code = result.get("improved_code", "")
+            
+            # Extract just the completion part
+            if "```python" in completed_code:
+                start = completed_code.find("```python") + 9
+                end = completed_code.find("```", start)
+                if end != -1:
+                    completed_code = completed_code[start:end].strip()
+            
+            return {
+                "prefix": prefix,
+                "suffix": suffix,
+                "completion": completed_code,
+                "confidence_score": result.get("confidence_score", 0.85),
+                "applied_fixes": result.get("applied_fixes", []),
+                "warnings": result.get("warnings", [])
+            }
+            
+        except json.JSONDecodeError:
+            # If response isn't JSON, return raw completion
+            return {
+                "prefix": prefix,
+                "suffix": suffix,
+                "completion": response,
+                "confidence_score": 0.8,
+                "applied_fixes": [],
+                "warnings": ["Raw completion returned"]
+            }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"FIM completion failed: {str(e)}")
+
 @app.post("/reports/improvement-analysis")
 async def generate_improvement_report(request: dict):
     """

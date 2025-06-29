@@ -128,14 +128,21 @@ class MultiLLMCodeImprover:
         self.deepseek_api_key = os.environ.get("DEEPSEEK_API_KEY")
         
     def _call_deepseek_r1(self, prompt: str, api_key: Optional[str] = None) -> str:
-        """Call DeepSeek API for code improvement with JSON prefix completion."""
+        """Call DeepSeek API for code improvement with multiple completion strategies."""
         from openai import OpenAI
         
         used_api_key = api_key or self.deepseek_api_key
         if not used_api_key:
             raise ValueError("DeepSeek API key not available")
         
-        # Use OpenAI client with DeepSeek beta endpoint for prefix completion
+        # Try FIM completion first for code-specific improvements
+        if "```python" in prompt or "def " in prompt or "class " in prompt:
+            try:
+                return self._call_deepseek_fim_completion(prompt, used_api_key)
+            except Exception:
+                pass  # Fall back to prefix completion
+        
+        # Use prefix completion for JSON responses
         client = OpenAI(
             api_key=used_api_key,
             base_url="https://api.deepseek.com/beta"
@@ -176,6 +183,93 @@ Always provide complete, working code in the improved_code field."""
         except Exception as e:
             # Fallback to function calling approach
             return self._call_deepseek_function_calling(prompt, used_api_key)
+    
+    def _call_deepseek_fim_completion(self, prompt: str, api_key: str) -> str:
+        """Use DeepSeek FIM (Fill In the Middle) completion for targeted code improvements."""
+        from openai import OpenAI
+        
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com/beta"
+        )
+        
+        # Extract code section for FIM completion
+        prefix, suffix = self._extract_fim_parts(prompt)
+        
+        try:
+            response = client.completions.create(
+                model="deepseek-chat",
+                prompt=prefix,
+                suffix=suffix,
+                max_tokens=2000,
+                temperature=0.1
+            )
+            
+            # Return completed code section
+            completed_code = response.choices[0].text
+            
+            # Format as structured JSON response
+            fim_response = {
+                "improved_code": prefix + completed_code + suffix,
+                "applied_fixes": [
+                    {
+                        "type": "implementation",
+                        "description": "FIM completion applied to improve code section",
+                        "confidence": 0.85
+                    }
+                ],
+                "improvement_summary": "Code completion using FIM (Fill In the Middle) approach",
+                "confidence_score": 0.85,
+                "warnings": ["Verify completed implementation matches requirements"]
+            }
+            
+            return json.dumps(fim_response)
+            
+        except Exception as e:
+            raise Exception(f"DeepSeek FIM completion failed: {str(e)}")
+    
+    def _extract_fim_parts(self, prompt: str) -> tuple:
+        """Extract prefix and suffix for FIM completion from prompt."""
+        
+        # Look for code blocks in the prompt
+        if "```python" in prompt:
+            # Extract code block
+            start = prompt.find("```python")
+            end = prompt.find("```", start + 9)
+            if end != -1:
+                code_block = prompt[start+9:end].strip()
+                
+                # Find incomplete sections (TODO, # Fix:, etc.)
+                lines = code_block.split('\n')
+                incomplete_line = -1
+                
+                for i, line in enumerate(lines):
+                    if any(marker in line.lower() for marker in ['todo', '# fix', '# improve', '# complete']):
+                        incomplete_line = i
+                        break
+                
+                if incomplete_line != -1:
+                    prefix_lines = lines[:incomplete_line+1]
+                    suffix_lines = lines[incomplete_line+1:]
+                    
+                    prefix = '\n'.join(prefix_lines)
+                    suffix = '\n'.join(suffix_lines) if suffix_lines else ""
+                    
+                    return prefix, suffix
+        
+        # Fallback: split at function definitions or class definitions
+        if "def " in prompt or "class " in prompt:
+            # Find incomplete function/class
+            lines = prompt.split('\n')
+            for i, line in enumerate(lines):
+                if line.strip().endswith(':') and ('def ' in line or 'class ' in line):
+                    prefix = '\n'.join(lines[:i+1])
+                    suffix = '\n'.join(lines[i+1:]) if i+1 < len(lines) else ""
+                    return prefix, suffix
+        
+        # Default: use first half as prefix, second half as suffix
+        mid_point = len(prompt) // 2
+        return prompt[:mid_point], prompt[mid_point:]
     
     def _call_deepseek_function_calling(self, prompt: str, api_key: str) -> str:
         """Fallback to DeepSeek Function Calling approach."""
