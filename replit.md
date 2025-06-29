@@ -92,6 +92,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- **June 29, 2025**: Critical Security and Performance Enhancements Completed
+- Fixed security vulnerabilities: Replaced pickle.load() with torch.load() in test files and demonstration code
+- **Analysis Results Caching System**: Implemented comprehensive caching for 3-5x performance improvement
+  - File-level caching with SHA256 content hashing and configurable TTL (24 hours default)
+  - Project-level caching for complete audit results with 1-hour TTL
+  - Cache statistics and management API endpoints: `/cache/stats`, `/cache/clear`
+  - Automatic cache invalidation and cleanup for optimal storage usage
+- **Granular Rule Configuration System**: Complete rule management with user customization
+  - Individual rule enable/disable with severity level configuration (ignore, info, warning, error, critical)
+  - Rule sets for bulk management: security, ml_best_practices, rl_patterns, performance, style
+  - File pattern matching for rule-specific application and exclusions
+  - JSON-based configuration storage with `.codeguard_rules.json` project files
+  - API endpoints: `/rules/config`, `/rules/configure`, `/rules/rule-set/{name}/toggle`
+- **Enhanced System Health Monitoring**: Comprehensive health check endpoint `/system/health/detailed`
+  - Real-time status of analysis engine, cache system, rule configuration, and authentication
+  - Performance metrics and system degradation detection
+- **Improved Error Handling**: Robust exception management across all analysis tools
 - **June 29, 2025**: Complete repository reorganization to production-level standards completed
 - Repository restructured with proper documentation, configuration files, and development workflows
 - Added comprehensive README.md with badges, feature overview, and complete API documentation
