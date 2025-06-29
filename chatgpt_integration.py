@@ -519,35 +519,38 @@ class MultiLLMCodeImprover:
             framework = "openai-gym"
         
         prompt = f"""
-Analyze and improve the following Python code using available tools for comprehensive analysis.
+You must improve THIS EXACT Python code by applying the specific fixes identified by CodeGuard analysis.
 
-**Code Analysis Request:**
-- Filename: {request.filename}
-- Framework: {framework}
-- Improvement Level: {request.improvement_level}
+**IMPORTANT:** You must fix the provided code, not create a new example. Start with the original code and apply only the necessary fixes.
 
-**Original Code:**
+**Original Code to Fix:**
 ```python
 {request.original_code}
 ```
 
-**Detected Issues:**
+**Specific Issues Found by CodeGuard:**
 {issues_summary}
 
-**Suggested Fixes:**
+**Specific Fixes to Apply:**
 {fixes_summary}
 
-**Instructions:**
-1. Use analyze_code_security tool to identify security vulnerabilities
-2. Use generate_ml_best_practices tool for ML/RL specific improvements  
-3. Use optimize_code_performance tool for performance enhancements
-4. After tool analysis, provide improved code in JSON format
+**Requirements:**
+1. Start with the EXACT original code above
+2. Apply ONLY the specific fixes listed
+3. Keep the same function structure and logic
+4. Do not add new functionality unless fixing a bug
+5. Preserve the original code's intent and behavior
 
-Return final response as JSON with:
-- improved_code: Complete improved code
-- applied_fixes: List of fixes applied with descriptions
-- improvement_summary: Summary of all improvements made
-- confidence_score: Confidence in improvements (0.0-1.0)
+**Analysis Tools Available:**
+- analyze_code_security: For security vulnerability fixes
+- generate_ml_best_practices: For ML/RL specific improvements
+- optimize_code_performance: For performance fixes
+
+**Return JSON format:**
+- improved_code: The EXACT original code with ONLY the listed fixes applied
+- applied_fixes: Descriptions of what was actually changed
+- improvement_summary: What was fixed in the original code
+- confidence_score: 0.0-1.0
 - warnings: Any warnings or considerations
 """
         return prompt
@@ -559,36 +562,36 @@ Return final response as JSON with:
         fixes_summary = self._format_fixes_for_prompt(request.fixes)
         
         prompt = f"""
-Improve the following Python code by implementing the suggested fixes from CodeGuard analysis.
+Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not create a generic example.
 
-**Original Code ({request.filename}):**
+**CRITICAL: You must improve the provided code, not write a new example.**
+
+**Original Code to Fix ({request.filename}):**
 ```python
 {request.original_code}
 ```
 
-**Issues Found:**
+**Specific Issues to Fix:**
 {issues_summary}
 
-**Suggested Fixes:**
+**Specific Fixes to Apply:**
 {fixes_summary}
 
-**Improvement Level:** {request.improvement_level}
-**Preserve Functionality:** {request.preserve_functionality}
+**Requirements:**
+1. Start with the EXACT original code above
+2. Apply ONLY the specific fixes listed by CodeGuard
+3. Keep the original function names, structure, and logic
+4. Do not add new functions unless fixing undefined variables
+5. Preserve the original code's behavior and intent
+6. Fix security issues (pickle → json), add missing seeding, replace print → logging
+7. Remove unused imports, fix formatting only as specified
 
-Please:
-1. Apply the suggested fixes where appropriate
-2. Maintain the original functionality unless explicitly improving it
-3. Add missing imports, error handling, and best practices
-4. Fix security issues (pickle, eval usage) with safe alternatives
-5. Improve ML/RL specific patterns (seeding, env resets, etc.)
-6. Ensure code follows PEP 8 and modern Python practices
-
-Return JSON with:
-- "improved_code": The complete improved code
-- "applied_fixes": List of fixes applied with descriptions
-- "improvement_summary": Brief summary of changes made
-- "confidence_score": Float 0-1 indicating confidence in improvements
-- "warnings": Any potential issues or considerations
+**Return JSON with:**
+- "improved_code": The original code with ONLY the listed fixes applied
+- "applied_fixes": List describing what was actually changed in the original code
+- "improvement_summary": Summary of fixes applied to the original code
+- "confidence_score": Float 0-1 
+- "warnings": Any considerations about the fixes
 """
         return prompt
     
