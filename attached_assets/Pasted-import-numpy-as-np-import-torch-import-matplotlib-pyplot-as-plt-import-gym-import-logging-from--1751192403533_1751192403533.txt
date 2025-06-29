@@ -1,0 +1,158 @@
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+import gym
+import logging
+from janus.agents.components.vae import VariationalAutoencoder
+from janus.agents.components.mdn_rnn import MDNRNN
+
+# Set random seeds for reproducibility
+torch.manual_seed(42)
+np.random.seed(42)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def visualize_vae_reconstruction(vae, observations, title="VAE Reconstruction"):
+    """Visualize how well the VAE reconstructs observations."""
+    vae.eval()
+
+    fig, axes = plt.subplots(2, 5, figsize=(15, 6))
+    fig.suptitle(title)
+
+    # Select 5 random observations
+    indices = np.random.choice(len(observations), 5, replace=False)
+
+    for i, idx in enumerate(indices):
+        obs = observations[idx]
+        obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
+
+        # Reconstruct
+        with torch.no_grad():
+            obs_flat = obs_tensor.view(1, -1)
+            recon, _, _, z = vae(obs_flat)
+            recon = recon.view(obs.shape)
+
+        # Original
+        axes[0, i].bar(range(len(obs)), obs)
+        axes[0, i].set_title(f"Original {idx}")
+        axes[0, i].set_ylim(-3, 3)
+
+        # Reconstruction
+        axes[1, i].bar(range(len(obs)), recon.numpy())
+        axes[1, i].set_title(f"Reconstructed (z_dim={z.shape[1]})")
+        axes[1, i].set_ylim(-3, 3)
+
+    plt.tight_layout()
+    plt.close()
+
+
+def visualize_latent_space(vae, observations, labels=None):
+    """Visualize the learned latent space (2D projection)."""
+    vae.eval()
+
+    # Encode all observations
+    latents = []
+    with torch.no_grad():
+        for obs in observations:
+            obs_tensor = torch.FloatTensor(obs).unsqueeze(0).view(1, -1)
+            mu, _ = vae.encode(obs_tensor)
+            latents.append(mu.numpy())
+
+    latents = np.concatenate(latents, axis=0)
+
+    # Plot first 2 dimensions
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    if labels is not None:
+        scatter = ax.scatter(latents[:, 0], latents[:, 1], c=labels, cmap='viridis', alpha=0.6)
+        plt.colorbar(scatter, ax=ax, label='Episode Progress')
+    else:
+        ax.scatter(latents[:, 0], latents[:, 1], alpha=0.6)
+
+    ax.set_xlabel('Latent Dimension 1')
+    ax.set_ylabel('Latent Dimension 2')
+    ax.set_title('Learned Latent Space (2D Projection)')
+    ax.grid(True, alpha=0.3)
+    plt.close()
+
+
+def run_demo():
+    """Run the complete World Model demo."""
+    logger.info("=== World Model Demo ===")
+
+    # Setup environment
+    env = gym.make('CartPole-v1')
+    env.seed(42)
+    obs_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.n
+
+    logger.info(f"Environment: CartPole-v1")
+    logger.info(f"Observation dimension: {obs_dim}")
+    logger.info(f"Action dimension: {action_dim}")
+
+    # Collect data
+    logger.info("Collecting demonstration data...")
+    observations = []
+    actions = []
+    episode_starts = []
+
+    for _ in range(20):
+        obs = env.reset()
+        episode_starts.append(len(observations))
+
+        for _ in range(100):
+            observations.append(obs)
+            action = env.action_space.sample()
+            actions.append(action)
+
+            obs, _, done, _ = env.step(action)
+            if done:
+                break
+
+    observations = np.array(observations)
+    actions = np.array(actions)
+    labels = np.array([i // 10 for i in range(len(observations))])
+
+    logger.info(f"Collected {len(observations)} observations")
+
+    # Train VAE
+    logger.info("Training VAE...")
+    vae = VariationalAutoencoder(
+        input_dim=obs_dim,
+        latent_dim=8,
+        hidden_dims=[32, 16],
+        beta=0.5
+    )
+
+    optimizer = torch.optim.Adam(vae.parameters(), lr=1e-3)
+    vae.train()
+
+    for epoch in range(50):
+        batch_idx = np.random.choice(len(observations), 32)
+        batch_obs = torch.FloatTensor(observations[batch_idx])
+
+        recon, mu, logvar, _ = vae(batch_obs)
+        loss, _ = vae.loss(batch_obs, recon, mu, logvar)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if epoch % 10 == 0:
+            logger.info(f"  Epoch {epoch}, Loss: {loss.item():.4f}")
+
+    logger.info("Visualizing VAE performance...")
+    visualize_vae_reconstruction(vae, observations[:20], "VAE Reconstruction Quality")
+    plt.savefig('vae_reconstruction.png')
+    logger.info("  Saved: vae_reconstruction.png")
+
+    visualize_latent_space(vae, observations[:200], labels[:200])
+    plt.savefig('latent_space.png')
+    logger.info("  Saved: latent_space.png")
+
+    env.close()
+
+if __name__ == '__main__':
+    run_demo()
