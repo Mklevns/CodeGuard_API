@@ -354,6 +354,14 @@ Preferred communication style: Simple, everyday language.
 - Both OpenAI and DeepSeek providers now deliver clean, complete code files instead of original + fixes format
 - Clean Code Prompt Enhancer automatically analyzes issue complexity and applies appropriate output formatting
 - Validation checklist ensures AI responses are complete, clean, and ready for immediate file replacement
+- **June 29, 2025**: DeepSeek Keep-Alive Timeout Reset System implemented for reliable API handling
+- Fixed DeepSeek timeout issues by properly handling empty lines and SSE keep-alive comments sent by API
+- Implemented streaming response parser that resets timeout counter on each keep-alive message received
+- Enhanced timeout management: base timeout resets when DeepSeek sends empty lines to prevent TCP interruption
+- Added proper JSON extraction from mixed response content with keep-alive filtering
+- DeepSeek API now works reliably with extended processing times for complex code analysis
+- System handles both non-streaming (empty lines) and streaming (SSE comments) keep-alive patterns
+- Graceful error handling provides clear messages when API keys missing instead of silent timeouts
 
 ## Deployment Status
 
