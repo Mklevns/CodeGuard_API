@@ -16,6 +16,7 @@ from rule_loader import CustomRuleEngine
 from rl_environment_plugin import rl_env_analyzer, rl_config_analyzer
 from false_positive_filter import get_false_positive_filter
 from semantic_analyzer import analyze_code_semantically, SemanticFalsePositiveFilter
+from graph_analyzer import analyze_repository_structure
 
 
 class EnhancedAuditEngine:
@@ -33,7 +34,9 @@ class EnhancedAuditEngine:
             'isort': self._run_isort,
             'ml_rules': self._run_ml_rules,
             'custom_rules': self._run_custom_rules,
-            'rl_plugin': self._run_rl_plugin
+            'rl_plugin': self._run_rl_plugin,
+            'dependency_audit': self._run_dependency_audit,
+            'complexity_analysis': self._run_complexity_analysis
         }
     
     def analyze_code(self, request: AuditRequest) -> AuditResponse:
@@ -652,3 +655,218 @@ class EnhancedAuditEngine:
             return "Add return statement or specify return type as None"
             
         return "Review type annotations and ensure type safety"
+    
+    def _run_dependency_audit(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
+        """Run dependency and license audit using pip-audit and pip-licenses."""
+        issues = []
+        fixes = []
+
+        if original_filename not in ["pyproject.toml", "requirements.txt", "setup.py", "Pipfile"]:
+            return issues, fixes
+
+        # Vulnerability scanning with pip-audit
+        try:
+            result = subprocess.run(
+                ["pip-audit", "--format=json", "-r", file_path],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=temp_dir
+            )
+            if result.stdout:
+                try:
+                    vulnerabilities = json.loads(result.stdout)
+                    for vuln in vulnerabilities.get("vulnerabilities", []):
+                        issues.append(Issue(
+                            filename=original_filename,
+                            line=1,
+                            type="security",
+                            description=f"Vulnerability found in {vuln['name']} ({vuln['id']}): {vuln['summary']}",
+                            source="pip-audit",
+                            severity="error"
+                        ))
+                        
+                        # Generate fix suggestion
+                        fix_version = vuln.get('fix_versions', [])
+                        if fix_version:
+                            fix = Fix(
+                                filename=original_filename,
+                                line=1,
+                                suggestion=f"Update {vuln['name']} to version {fix_version[0]} or later",
+                                diff=f"- {vuln['name']}=={vuln['installed_version']}\n+ {vuln['name']}>={fix_version[0]}",
+                                replacement_code=None,
+                                auto_fixable=False
+                            )
+                            fixes.append(fix)
+                except json.JSONDecodeError:
+                    pass
+        except subprocess.TimeoutExpired:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description="Dependency vulnerability scan timed out",
+                source="pip-audit",
+                severity="warning"
+            ))
+        except FileNotFoundError:
+            # pip-audit not available, skip silently
+            pass
+        except Exception as e:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description=f"Dependency audit failed: {str(e)}",
+                source="pip-audit",
+                severity="warning"
+            ))
+
+        # License auditing with pip-licenses
+        try:
+            result = subprocess.run(
+                ["pip-licenses", "--format=json"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=temp_dir
+            )
+            if result.stdout:
+                try:
+                    licenses = json.loads(result.stdout)
+                    problematic_licenses = ['GPL', 'AGPL', 'UNKNOWN', 'COMMERCIAL']
+                    
+                    for lib in licenses:
+                        license_name = lib.get('License', 'UNKNOWN')
+                        if any(prob in license_name.upper() for prob in problematic_licenses):
+                            severity = "error" if license_name == 'UNKNOWN' else "warning"
+                            issues.append(Issue(
+                                filename=original_filename,
+                                line=1,
+                                type="license",
+                                description=f"Problematic license '{license_name}' for {lib['Name']}",
+                                source="pip-licenses",
+                                severity=severity
+                            ))
+                            
+                            if license_name == 'UNKNOWN':
+                                fix = Fix(
+                                    filename=original_filename,
+                                    line=1,
+                                    suggestion=f"Review license for {lib['Name']} - unknown license may cause compliance issues",
+                                    diff=None,
+                                    replacement_code=None,
+                                    auto_fixable=False
+                                )
+                                fixes.append(fix)
+                except json.JSONDecodeError:
+                    pass
+        except subprocess.TimeoutExpired:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description="License audit timed out",
+                source="pip-licenses",
+                severity="warning"
+            ))
+        except FileNotFoundError:
+            # pip-licenses not available, skip silently
+            pass
+        except Exception as e:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description=f"License audit failed: {str(e)}",
+                source="pip-licenses",
+                severity="warning"
+            ))
+
+        return issues, fixes
+    
+    def _run_complexity_analysis(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
+        """Analyze code complexity with radon."""
+        issues = []
+        fixes = []
+
+        if not original_filename.endswith('.py'):
+            return issues, fixes
+
+        try:
+            import radon.complexity as complexity_mod
+            import radon.metrics as metrics_mod
+            
+            # Get cyclomatic complexity using direct API
+            with open(file_path, 'r', encoding='utf-8') as f:
+                source_code = f.read()
+            
+            # Calculate complexity
+            complexity_results = complexity_mod.cc_visit(source_code)
+            for result in complexity_results:
+                if result.complexity > 10:  # High complexity threshold
+                    issues.append(Issue(
+                        filename=original_filename,
+                        line=result.lineno,
+                        type="complexity",
+                        description=f"{result.name} has high cyclomatic complexity ({result.complexity}). Consider refactoring.",
+                        source="radon",
+                        severity="warning" if result.complexity <= 15 else "error"
+                    ))
+                    
+                    fix = Fix(
+                        filename=original_filename,
+                        line=result.lineno,
+                        suggestion=f"Refactor {result.name} to reduce complexity from {result.complexity} to below 10",
+                        diff=None,
+                        replacement_code=None,
+                        auto_fixable=False
+                    )
+                    fixes.append(fix)
+            
+            # Get maintainability index
+            try:
+                mi_result = metrics_mod.mi_visit(source_code, multi=True)
+                if mi_result < 20:  # Low maintainability
+                    issues.append(Issue(
+                        filename=original_filename,
+                        line=1,
+                        type="maintainability",
+                        description=f"Low maintainability index ({mi_result:.1f}). Consider refactoring for better code quality.",
+                        source="radon",
+                        severity="warning"
+                    ))
+                    
+                    fix = Fix(
+                        filename=original_filename,
+                        line=1,
+                        suggestion="Improve maintainability by reducing complexity, adding documentation, and following best practices",
+                        diff=None,
+                        replacement_code=None,
+                        auto_fixable=False
+                    )
+                    fixes.append(fix)
+            except Exception:
+                # Maintainability index calculation failed, skip
+                pass
+            
+        except ImportError:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description="radon not available for complexity analysis",
+                source="radon",
+                severity="info"
+            ))
+        except Exception as e:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description=f"Complexity analysis failed: {str(e)}",
+                source="radon",
+                severity="warning"
+            ))
+
+        return issues, fixes
