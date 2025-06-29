@@ -279,6 +279,14 @@ Preferred communication style: Simple, everyday language.
 - Enhanced response parsing to filter out keep-alive messages and extract valid JSON responses
 - Increased timeout to 30 seconds for DeepSeek Function Calling to accommodate longer processing times
 - Improved error handling with detailed messages for better debugging and user experience
+- **June 29, 2025**: Fixed audit-and-improve functionality in playground website
+- Updated AuditRequest model to properly handle ai_provider and ai_api_key parameters from playground
+- Fixed /audit-and-improve endpoint to use unfiltered audit results (preventing false positive filtering from hiding detected issues)
+- Enhanced endpoint to properly pass AI provider and API key to the improvement system with error handling
+- Updated playground JavaScript to correctly transform audit-and-improve response format for display
+- Enhanced DeepSeek integration to handle keep-alive empty lines and SSE comments that prevent TCP timeouts
+- Fixed telemetry handling with proper data type validation for audit session recording
+- Audit-and-improve now properly: runs full audit → detects all issues → passes to AI provider → returns improved code with confidence scores
 
 ## Deployment Status
 

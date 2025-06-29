@@ -1121,13 +1121,30 @@ async def audit_and_improve_combined(request: AuditRequest):
         
         # Record telemetry (skip if errors occur to avoid blocking)
         try:
+            from datetime import datetime
             from telemetry import AuditSession
+            
+            # Get error types and severity breakdown
+            error_type_counts = {}
+            severity_counts = {}
+            for issue in audit_response.issues:
+                issue_type = issue.type
+                severity = issue.severity
+                error_type_counts[issue_type] = error_type_counts.get(issue_type, 0) + 1
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            
+            tools_used = list(set(issue.source for issue in audit_response.issues))
+            
             session_data = AuditSession(
                 session_id=session_id,
+                timestamp=datetime.now(),
                 file_count=len(request.files),
                 total_issues=len(audit_response.issues),
+                error_types=error_type_counts,
+                severity_breakdown=severity_counts,
                 analysis_time_ms=int(processing_time * 1000),
-                framework_detected=framework
+                framework_detected=framework,
+                tools_used=tools_used
             )
             telemetry_collector.record_audit_session(session_data)
         except Exception:

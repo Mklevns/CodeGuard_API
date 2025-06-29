@@ -164,19 +164,30 @@ class MultiLLMCodeImprover:
             # Handle DeepSeek's keep-alive responses
             response_text = response.text.strip()
             
-            # Filter out empty lines and keep-alive messages
-            lines = [line.strip() for line in response_text.split('\n') if line.strip()]
+            # Filter out empty lines and keep-alive comments
+            lines = []
+            for line in response_text.split('\n'):
+                line = line.strip()
+                # Skip empty lines and SSE keep-alive comments
+                if line and not line.startswith(': keep-alive'):
+                    lines.append(line)
+            
             if not lines:
                 raise Exception("DeepSeek API returned only keep-alive messages")
             
-            # Parse the actual JSON response (last non-empty line)
+            # Try to parse the response as JSON
             json_response = None
-            for line in reversed(lines):
-                try:
-                    json_response = json.loads(line)
-                    break
-                except json.JSONDecodeError:
-                    continue
+            # First try the complete response text as JSON
+            try:
+                json_response = json.loads(response_text)
+            except json.JSONDecodeError:
+                # If that fails, try to find valid JSON in the response
+                for line in reversed(lines):
+                    try:
+                        json_response = json.loads(line)
+                        break
+                    except json.JSONDecodeError:
+                        continue
             
             if not json_response:
                 raise Exception("No valid JSON response found in DeepSeek API response")

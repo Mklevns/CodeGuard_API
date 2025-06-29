@@ -310,8 +310,31 @@ def evaluate_model():
             }
 
             const data = await response.json();
-            this.currentResults = data;
-            this.displayResults(data, true);
+            
+            // Transform audit-and-improve response to match displayResults format
+            const transformedData = {
+                issues: data.audit_results?.issues || [],
+                fixes: data.audit_results?.fixes || [],
+                summary: data.audit_results?.summary || '',
+                frameworks: ['pytorch'], // Default, could be detected from options
+                confidence_score: data.combined_summary?.average_ai_confidence || 0,
+                // Get improved code from AI improvements if available
+                improved_code: data.ai_improvements && Object.keys(data.ai_improvements).length > 0 
+                    ? Object.values(data.ai_improvements)[0]?.improved_code 
+                    : null,
+                applied_fixes: data.ai_improvements && Object.keys(data.ai_improvements).length > 0 
+                    ? Object.values(data.ai_improvements)[0]?.applied_fixes || []
+                    : [],
+                improvement_summary: data.ai_improvements && Object.keys(data.ai_improvements).length > 0 
+                    ? Object.values(data.ai_improvements)[0]?.improvement_summary 
+                    : 'AI improvement not available (API key required)',
+                warnings: data.ai_improvements && Object.keys(data.ai_improvements).length > 0 
+                    ? Object.values(data.ai_improvements)[0]?.warnings || []
+                    : []
+            };
+            
+            this.currentResults = transformedData;
+            this.displayResults(transformedData, true);
             
         } catch (error) {
             console.error('Audit and improve error:', error);
