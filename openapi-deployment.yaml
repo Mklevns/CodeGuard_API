@@ -1,0 +1,130 @@
+openapi: 3.1.0
+info:
+  title: CodeGuard API
+  description: Static code analysis platform specialized in machine learning and reinforcement learning project diagnostics
+  version: "2.0.0"
+  contact:
+    name: CodeGuard Support
+    url: https://codeguard.replit.app
+servers:
+  - url: https://codeguard.replit.app
+    description: Production server
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    CodeFile:
+      type: object
+      properties:
+        filename:
+          type: string
+        content:
+          type: string
+      required:
+        - filename
+        - content
+    AuditRequest:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeFile'
+        options:
+          type: object
+          properties:
+            level:
+              type: string
+              enum: [basic, standard, comprehensive]
+            framework:
+              type: string
+            target:
+              type: string
+      required:
+        - files
+    Issue:
+      type: object
+      properties:
+        filename:
+          type: string
+        line:
+          type: integer
+        column:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+        source:
+          type: string
+    Fix:
+      type: object
+      properties:
+        filename:
+          type: string
+        line:
+          type: integer
+        suggestion:
+          type: string
+        replacement_code:
+          type: string
+        diff:
+          type: string
+        auto_fixable:
+          type: boolean
+    AuditResponse:
+      type: object
+      properties:
+        summary:
+          type: object
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/Issue'
+        fixes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Fix'
+paths:
+  /audit:
+    post:
+      summary: Analyze code files for issues
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditRequest'
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditResponse'
+        '401':
+          description: Authentication required
+        '500':
+          description: Analysis failed
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string

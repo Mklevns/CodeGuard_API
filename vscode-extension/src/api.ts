@@ -238,10 +238,7 @@ export class CodeGuardAPI {
         return response.data;
     }
 
-    // Legacy method compatibility
-    async auditCode(files: CodeFile[], options?: AuditOptions): Promise<AuditResponse> {
-        return this.audit(files, options);
-    }
+    // Legacy method removed - use audit() directly
 
     async generateReport(files: CodeFile[], format: string = 'markdown'): Promise<any> {
         return this.generateImprovementReport(files, format, false, true);

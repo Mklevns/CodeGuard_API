@@ -133,14 +133,21 @@ class CustomRuleEngine:
     
     def _check_pattern_rule(self, rule: Dict[str, Any], content: str) -> bool:
         """Check if a pattern-based rule matches the entire file content."""
-        if not self._matches_pattern(rule, content):
-            return False
-        
-        return not self._check_exclusions(rule, content)
+        return self._check_rule_match(rule, content, content)
     
     def _check_line_rule(self, rule: Dict[str, Any], line: str, full_content: str) -> bool:
         """Check if a line-based rule matches a specific line."""
-        return self._matches_pattern(rule, line)
+        return self._check_rule_match(rule, line, full_content, check_exclusions=False)
+    
+    def _check_rule_match(self, rule: Dict[str, Any], target_content: str, full_content: str, check_exclusions: bool = True) -> bool:
+        """Unified rule matching logic to eliminate code duplication."""
+        if not self._matches_pattern(rule, target_content):
+            return False
+        
+        if check_exclusions:
+            return not self._check_exclusions(rule, full_content)
+        
+        return True
     
     def _map_severity_to_type(self, severity: str) -> str:
         """Map severity level to issue type."""
