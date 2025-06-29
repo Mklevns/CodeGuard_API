@@ -29,11 +29,21 @@ class CodeGuardPlayground {
     }
 
     setupEventListeners() {
+        // Helper function to safely add event listeners
+        const safeAddEventListener = (elementId, event, handler) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`Element with ID '${elementId}' not found`);
+            }
+        };
+
         // API key management
-        document.getElementById('rememberKey').addEventListener('change', (e) => {
+        safeAddEventListener('rememberKey', 'change', (e) => {
             if (e.target.checked) {
-                const apiKey = document.getElementById('apiKey').value;
-                const provider = document.getElementById('aiProvider').value;
+                const apiKey = document.getElementById('apiKey')?.value;
+                const provider = document.getElementById('aiProvider')?.value;
                 if (apiKey) {
                     localStorage.setItem('codeguard_api_key', apiKey);
                     localStorage.setItem('codeguard_ai_provider', provider);
@@ -46,43 +56,41 @@ class CodeGuardPlayground {
             }
         });
 
-        document.getElementById('apiKey').addEventListener('input', (e) => {
-            if (document.getElementById('rememberKey').checked) {
+        safeAddEventListener('apiKey', 'input', (e) => {
+            const rememberKeyEl = document.getElementById('rememberKey');
+            if (rememberKeyEl?.checked) {
                 localStorage.setItem('codeguard_api_key', e.target.value);
             }
         });
 
-        document.getElementById('aiProvider').addEventListener('change', (e) => {
-            if (document.getElementById('rememberKey').checked) {
+        safeAddEventListener('aiProvider', 'change', (e) => {
+            const rememberKeyEl = document.getElementById('rememberKey');
+            if (rememberKeyEl?.checked) {
                 localStorage.setItem('codeguard_ai_provider', e.target.value);
             }
         });
 
         // Code management
-        document.getElementById('loadExample').addEventListener('click', () => this.loadExampleCode());
-        document.getElementById('clearCode').addEventListener('click', () => this.clearCode());
+        safeAddEventListener('loadExample', 'click', () => this.loadExampleCode());
+        safeAddEventListener('clearCode', 'click', () => this.clearCode());
 
         // Repository context
-        const githubRepoUrl = document.getElementById('githubRepoUrl');
-        const analyzeRepo = document.getElementById('analyzeRepo');
-        const repoFileSelect = document.getElementById('repoFileSelect');
-        
-        if (githubRepoUrl) githubRepoUrl.addEventListener('input', () => this.validateRepoUrl());
-        if (analyzeRepo) analyzeRepo.addEventListener('click', () => this.analyzeRepository());
-        if (repoFileSelect) repoFileSelect.addEventListener('change', () => this.loadSelectedRepoFile());
+        safeAddEventListener('githubRepoUrl', 'input', () => this.validateRepoUrl());
+        safeAddEventListener('analyzeRepo', 'click', () => this.analyzeRepository());
+        safeAddEventListener('repoFileSelect', 'change', () => this.loadSelectedRepoFile());
 
         // Analysis buttons
-        document.getElementById('auditBtn').addEventListener('click', () => this.auditCode());
-        document.getElementById('improveBtn').addEventListener('click', () => this.improveCode());
-        document.getElementById('auditImproveBtn').addEventListener('click', () => this.auditAndImprove());
-        document.getElementById('improveWithContextBtn').addEventListener('click', () => this.improveWithRelatedContext());
-        document.getElementById('fimBtn').addEventListener('click', () => this.openFimTab());
+        safeAddEventListener('auditBtn', 'click', () => this.auditCode());
+        safeAddEventListener('improveBtn', 'click', () => this.improveCode());
+        safeAddEventListener('auditImproveBtn', 'click', () => this.auditAndImprove());
+        safeAddEventListener('improveWithContextBtn', 'click', () => this.improveWithRelatedContext());
+        safeAddEventListener('fimBtn', 'click', () => this.openFimTab());
         
         // FIM completion buttons
-        document.getElementById('runFimBtn').addEventListener('click', () => this.runFimCompletion());
-        document.getElementById('loadFimExample').addEventListener('click', () => this.loadFimExample());
-        document.getElementById('copyFimResult').addEventListener('click', () => this.copyFimResult());
-        document.getElementById('applyFimResult').addEventListener('click', () => this.applyFimResult());
+        safeAddEventListener('runFimBtn', 'click', () => this.runFimCompletion());
+        safeAddEventListener('loadFimExample', 'click', () => this.loadFimExample());
+        safeAddEventListener('copyFimResult', 'click', () => this.copyFimResult());
+        safeAddEventListener('applyFimResult', 'click', () => this.applyFimResult());
 
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -90,27 +98,16 @@ class CodeGuardPlayground {
         });
 
         // Export buttons
-        document.getElementById('copyImproved').addEventListener('click', () => this.copyImprovedCode());
-        document.getElementById('downloadImproved').addEventListener('click', () => this.downloadImprovedCode());
-        document.getElementById('exportMarkdown').addEventListener('click', () => this.exportReport('markdown'));
-        document.getElementById('exportHtml').addEventListener('click', () => this.exportReport('html'));
+        safeAddEventListener('copyImproved', 'click', () => this.copyImprovedCode());
+        safeAddEventListener('downloadImproved', 'click', () => this.downloadImprovedCode());
+        safeAddEventListener('exportMarkdown', 'click', () => this.exportReport('markdown'));
+        safeAddEventListener('exportHtml', 'click', () => this.exportReport('html'));
         
-        // Enhancement buttons
-        const cacheStatsBtn = document.getElementById('cacheStatsBtn');
-        const clearCacheBtn = document.getElementById('clearCacheBtn');
-        const ruleConfigBtn = document.getElementById('ruleConfigBtn');
-        const systemHealthBtn = document.getElementById('systemHealthBtn');
-        
-        if (cacheStatsBtn) cacheStatsBtn.addEventListener('click', () => this.showCacheStats());
-        if (clearCacheBtn) clearCacheBtn.addEventListener('click', () => this.clearCache());
-        if (ruleConfigBtn) ruleConfigBtn.addEventListener('click', () => this.showRuleConfig());
-        if (systemHealthBtn) systemHealthBtn.addEventListener('click', () => this.showSystemHealth());
-        
-        // GitHub context buttons (only add listeners for elements that exist)
-        const analyzeRepoBtn = document.getElementById('analyzeRepo');
-        if (analyzeRepoBtn) {
-            // Already added above, no need to duplicate
-        }
+        // System management buttons
+        safeAddEventListener('cacheStatsBtn', 'click', () => this.showCacheStats());
+        safeAddEventListener('clearCacheBtn', 'click', () => this.clearCache());
+        safeAddEventListener('ruleConfigBtn', 'click', () => this.showRuleConfig());
+        safeAddEventListener('systemHealthBtn', 'click', () => this.showSystemHealth());
     }
 
     loadExampleCode() {
