@@ -1,0 +1,13 @@
+run = "python main.py"
+
+[deployment]
+run = ["python", "main_production.py"]
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+exposeLocalhost = true
+
+[env]
+ENVIRONMENT = "production"

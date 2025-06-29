@@ -1270,7 +1270,7 @@ if __name__ == "__main__":
     
     # Set appropriate default port based on environment
     if environment == "production":
-        default_port = 8080  # Cloud Run standard port
+        default_port = 8080  # Production deployment port
     else:
         default_port = 5000  # Replit development port
     

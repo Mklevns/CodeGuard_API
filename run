@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Production deployment script for CodeGuard API
+# This file is used by Replit deployment system
+
+echo "Starting CodeGuard API in production mode..."
+
+# Set production environment
+export ENVIRONMENT=production
+export PORT=${PORT:-8080}
+
+# Start the application
+exec python main.py
