@@ -66,7 +66,7 @@ class MultiLLMCodeImprover:
         }
         
         data = {
-            "model": "deepseek-chat",
+            "model": "deepseek-reasoner",
             "messages": [
                 {
                     "role": "user",
@@ -79,12 +79,21 @@ class MultiLLMCodeImprover:
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=60)
+            response = requests.post(url, headers=headers, json=data, timeout=10)
             response.raise_for_status()
             
             result = response.json()
-            return result["choices"][0]["message"]["content"]
+            content = result["choices"][0]["message"]["content"]
             
+            # DeepSeek reasoner may include reasoning tokens, extract main content
+            if "<thinking>" in content and "</thinking>" in content:
+                # Extract content after reasoning section
+                content = content.split("</thinking>")[-1].strip()
+            
+            return content
+            
+        except requests.exceptions.Timeout:
+            raise Exception("DeepSeek reasoner API timed out - the model is analyzing your code")
         except requests.exceptions.RequestException as e:
             raise Exception(f"DeepSeek API request failed: {str(e)}")
         except (KeyError, IndexError) as e:
