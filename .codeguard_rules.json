@@ -1,0 +1,224 @@
+{
+  "name": "default",
+  "version": "1.0",
+  "default_severity": "warning",
+  "global_excludes": [
+    "__pycache__",
+    "*.pyc",
+    ".git",
+    "node_modules"
+  ],
+  "rules": {
+    "S001": {
+      "rule_id": "S001",
+      "enabled": true,
+      "severity": "critical",
+      "description": "Dangerous function usage (eval, exec)",
+      "tags": [
+        "security",
+        "dangerous"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "S002": {
+      "rule_id": "S002",
+      "enabled": true,
+      "severity": "error",
+      "description": "Unsafe pickle usage",
+      "tags": [
+        "security",
+        "serialization"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "S003": {
+      "rule_id": "S003",
+      "enabled": true,
+      "severity": "warning",
+      "description": "Hardcoded credentials",
+      "tags": [
+        "security",
+        "credentials"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "ML001": {
+      "rule_id": "ML001",
+      "enabled": true,
+      "severity": "warning",
+      "description": "Missing random seed for reproducibility",
+      "tags": [
+        "ml",
+        "reproducibility"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "ML002": {
+      "rule_id": "ML002",
+      "enabled": true,
+      "severity": "info",
+      "description": "GPU memory management suggestions",
+      "tags": [
+        "ml",
+        "performance",
+        "gpu"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "RL001": {
+      "rule_id": "RL001",
+      "enabled": true,
+      "severity": "error",
+      "description": "Missing environment reset in RL loops",
+      "tags": [
+        "rl",
+        "environment"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "RL002": {
+      "rule_id": "RL002",
+      "enabled": true,
+      "severity": "warning",
+      "description": "Action space mismatch",
+      "tags": [
+        "rl",
+        "environment",
+        "validation"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "RL003": {
+      "rule_id": "RL003",
+      "enabled": true,
+      "severity": "info",
+      "description": "Episode termination handling",
+      "tags": [
+        "rl",
+        "compatibility"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "P001": {
+      "rule_id": "P001",
+      "enabled": true,
+      "severity": "info",
+      "description": "Inefficient loop patterns",
+      "tags": [
+        "performance",
+        "optimization"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "P002": {
+      "rule_id": "P002",
+      "enabled": true,
+      "severity": "warning",
+      "description": "Memory leak potential",
+      "tags": [
+        "performance",
+        "memory"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "E501": {
+      "rule_id": "E501",
+      "enabled": true,
+      "severity": "info",
+      "description": "Line too long",
+      "tags": [
+        "style",
+        "formatting"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "W292": {
+      "rule_id": "W292",
+      "enabled": true,
+      "severity": "info",
+      "description": "No newline at end of file",
+      "tags": [
+        "style",
+        "formatting"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    },
+    "F401": {
+      "rule_id": "F401",
+      "enabled": true,
+      "severity": "info",
+      "description": "Imported but unused",
+      "tags": [
+        "style",
+        "imports"
+      ],
+      "file_patterns": [
+        "*.py"
+      ],
+      "exclude_patterns": []
+    }
+  },
+  "rule_sets": {
+    "security": [
+      "S001",
+      "S002",
+      "S003"
+    ],
+    "ml_best_practices": [
+      "ML001",
+      "ML002",
+      "ML003"
+    ],
+    "rl_patterns": [
+      "RL001",
+      "RL002",
+      "RL003"
+    ],
+    "performance": [
+      "P001",
+      "P002",
+      "P003"
+    ],
+    "style": [
+      "E501",
+      "W292",
+      "F401"
+    ]
+  }
+}
