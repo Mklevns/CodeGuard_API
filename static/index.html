@@ -328,7 +328,7 @@
                         <h3 class="text-lg font-semibold text-gray-800 mb-2">FIM (Fill In the Middle) Completion</h3>
                         <p class="text-sm text-gray-600">Target specific code sections for AI completion using DeepSeek</p>
                     </div>
-                    
+
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <!-- FIM Input -->
                         <div class="space-y-4">
@@ -337,13 +337,13 @@
                                 <textarea id="fimPrefix" class="w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm" 
                                     placeholder="def secure_function():&#10;    # TODO: Add security validation"></textarea>
                             </div>
-                            
+
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Code Suffix</label>
                                 <textarea id="fimSuffix" class="w-full h-32 p-3 border border-gray-300 rounded-md font-mono text-sm" 
                                     placeholder="&#10;    return result"></textarea>
                             </div>
-                            
+
                             <div class="flex space-x-3">
                                 <button id="runFimBtn" class="flex-1 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">
                                     Complete Code
@@ -353,7 +353,7 @@
                                 </button>
                             </div>
                         </div>
-                        
+
                         <!-- FIM Results -->
                         <div class="space-y-4">
                             <div>
@@ -362,14 +362,14 @@
                                     <pre><code id="fimResult" class="language-python text-sm"></code></pre>
                                 </div>
                             </div>
-                            
+
                             <div id="fimConfidence" class="hidden">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Confidence Score</label>
                                 <div class="bg-blue-50 p-3 rounded-md">
                                     <div class="text-lg font-semibold text-blue-600"><span id="fimConfidenceScore">0</span>%</div>
                                 </div>
                             </div>
-                            
+
                             <div class="flex space-x-2">
                                 <button id="copyFimResult" class="flex-1 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
                                     Copy Result

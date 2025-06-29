@@ -63,9 +63,13 @@ class CodeGuardPlayground {
         document.getElementById('clearCode').addEventListener('click', () => this.clearCode());
 
         // Repository context
-        document.getElementById('githubRepoUrl').addEventListener('input', () => this.validateRepoUrl());
-        document.getElementById('analyzeRepo').addEventListener('click', () => this.analyzeRepository());
-        document.getElementById('repoFileSelect').addEventListener('change', () => this.loadSelectedRepoFile());
+        const githubRepoUrl = document.getElementById('githubRepoUrl');
+        const analyzeRepo = document.getElementById('analyzeRepo');
+        const repoFileSelect = document.getElementById('repoFileSelect');
+        
+        if (githubRepoUrl) githubRepoUrl.addEventListener('input', () => this.validateRepoUrl());
+        if (analyzeRepo) analyzeRepo.addEventListener('click', () => this.analyzeRepository());
+        if (repoFileSelect) repoFileSelect.addEventListener('change', () => this.loadSelectedRepoFile());
 
         // Analysis buttons
         document.getElementById('auditBtn').addEventListener('click', () => this.auditCode());
@@ -92,10 +96,15 @@ class CodeGuardPlayground {
         document.getElementById('exportHtml').addEventListener('click', () => this.exportReport('html'));
         
         // Enhancement buttons
-        document.getElementById('cacheStatsBtn').addEventListener('click', () => this.showCacheStats());
-        document.getElementById('clearCacheBtn').addEventListener('click', () => this.clearCache());
-        document.getElementById('ruleConfigBtn').addEventListener('click', () => this.showRuleConfig());
-        document.getElementById('systemHealthBtn').addEventListener('click', () => this.showSystemHealth());
+        const cacheStatsBtn = document.getElementById('cacheStatsBtn');
+        const clearCacheBtn = document.getElementById('clearCacheBtn');
+        const ruleConfigBtn = document.getElementById('ruleConfigBtn');
+        const systemHealthBtn = document.getElementById('systemHealthBtn');
+        
+        if (cacheStatsBtn) cacheStatsBtn.addEventListener('click', () => this.showCacheStats());
+        if (clearCacheBtn) clearCacheBtn.addEventListener('click', () => this.clearCache());
+        if (ruleConfigBtn) ruleConfigBtn.addEventListener('click', () => this.showRuleConfig());
+        if (systemHealthBtn) systemHealthBtn.addEventListener('click', () => this.showSystemHealth());
         
         // GitHub context buttons (only add listeners for elements that exist)
         const analyzeRepoBtn = document.getElementById('analyzeRepo');
