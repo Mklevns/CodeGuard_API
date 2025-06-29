@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from openai import OpenAI
 from models import Issue, Fix, CodeFile
-from llm_prompt_generator import get_llm_prompt_generator
+from llm_prompt_generator import get_llm_prompt_generator, CustomPromptResponse
 from clean_code_prompt_enhancer import enhance_prompt_for_clean_code_output
 from deepseek_keepalive_handler import create_deepseek_handler
 from reliable_code_fixer import create_reliable_fixer
@@ -587,10 +587,10 @@ Always provide complete, working code in the improved_code field."""
                 
                 if context_result.get("context_available"):
                     repo_context = context_result["repository_context"]
-                    logger.info(f"Repository context loaded for {request.github_repo_url}")
+                    logging.info(f"Repository context loaded for {request.github_repo_url}")
                 
             except Exception as e:
-                logger.warning(f"Could not load repository context: {e}")
+                logging.warning(f"Could not load repository context: {e}")
         
         # Generate custom prompt based on audit results using LLM
         prompt_generator = get_llm_prompt_generator()
@@ -605,11 +605,17 @@ Always provide complete, working code in the improved_code field."""
         
         # Enhance prompt with repository context if available
         if repo_context:
-            enhanced_prompt = self._enhance_prompt_with_repo_context(
-                custom_prompt_response.get("system_prompt", ""),
-                repo_context
+            base_prompt = custom_prompt_response.system_prompt if hasattr(custom_prompt_response, 'system_prompt') else ""
+            enhanced_prompt = self._enhance_prompt_with_repo_context(base_prompt, repo_context)
+            # Create new response with enhanced prompt
+            from llm_prompt_generator import CustomPromptResponse
+            custom_prompt_response = CustomPromptResponse(
+                system_prompt=enhanced_prompt,
+                confidence_boost=custom_prompt_response.confidence_boost + 0.1,  # Boost for repo context
+                focus_areas=custom_prompt_response.focus_areas + ["repository_context"],
+                prompt_strategy=custom_prompt_response.prompt_strategy + "_with_repo_context",
+                estimated_effectiveness=min(1.0, custom_prompt_response.estimated_effectiveness + 0.15)
             )
-            custom_prompt_response["system_prompt"] = enhanced_prompt
         
         try:
             # Route to appropriate AI provider with custom prompt

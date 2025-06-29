@@ -18,6 +18,8 @@ class AuditRequest(BaseModel):
     options: Optional[AuditOptions] = Field(default=None, description="Optional audit configuration")
     ai_provider: Optional[str] = Field(default="openai", description="AI provider for improvements", examples=["openai", "deepseek", "gemini", "claude"])
     ai_api_key: Optional[str] = Field(default=None, description="AI API key for improvements")
+    github_repo_url: Optional[str] = Field(default=None, description="GitHub repository URL for context", examples=["https://github.com/user/repo"])
+    github_token: Optional[str] = Field(default=None, description="GitHub API token for private repositories")
 
     class Config:
         json_schema_extra = {
