@@ -85,7 +85,7 @@ class EnhancedAuditEngine:
             for tool_name, tool_func in self.tools.items():
                 try:
                     for file_path, original_filename, content in file_paths:
-                        issues, fixes = tool_func(file_path, original_filename, content, temp_dir)
+                        issues, fixes = tool_func(file_path, original_filename, content, unique_dir)
                         all_issues.extend(issues)
                         all_fixes.extend(fixes)
                 except Exception as e:

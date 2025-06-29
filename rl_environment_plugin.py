@@ -99,6 +99,17 @@ class RLEnvironmentAnalyzer:
                 issues.append(Issue(
                     filename=filename,
                     line=i + 1,
+                    type="warning",
+                    description="Reward clipping detected - verify this doesn't mask important reward signals",
+                    source="rl_plugin", 
+                    severity="warning"
+                ))
+            
+            # Check for hardcoded reward values that might indicate saturation
+            elif re.search(r'reward\s*=\s*[+-]?\d+\.?\d*\s*$', line):
+                issues.append(Issue(
+                    filename=filename,
+                    line=i + 1,
                     type="best_practice",
                     description="Reward clipping detected - ensure this doesn't mask important reward signals",
                     source="rl_plugin",
