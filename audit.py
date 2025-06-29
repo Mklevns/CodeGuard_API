@@ -3,7 +3,7 @@ import tempfile
 import os
 import re
 from typing import List, Dict, Tuple
-from models import AuditRequest, AuditResponse, Issue, Fix
+from src.codeguard.core.models import AuditRequest, AuditResponse, Issue, Fix
 from enhanced_audit import EnhancedAuditEngine
 
 def analyze_code(request: AuditRequest) -> AuditResponse:
