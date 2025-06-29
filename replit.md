@@ -362,6 +362,12 @@ Preferred communication style: Simple, everyday language.
 - DeepSeek API now works reliably with extended processing times for complex code analysis
 - System handles both non-streaming (empty lines) and streaming (SSE comments) keep-alive patterns
 - Graceful error handling provides clear messages when API keys missing instead of silent timeouts
+- **June 29, 2025**: Code Improvement Endpoint Differentiation completed - distinct use cases and capabilities
+- Enhanced `/improve/code` as TARGETED improvement: requires pre-existing issues, preserves structure, focuses on specific lines
+- Upgraded `/audit-and-improve` as COMPREHENSIVE analysis: discovers all issues automatically, applies aggressive improvements
+- Added `/improve/quick-fix` for instant automated fixes: sub-second security and formatting fixes without AI processing
+- Created `/improve/experimental` for cutting-edge AI features: DeepSeek reasoning, function calling, custom prompts
+- Each endpoint now serves distinct workflows: instant fixes → targeted improvements → comprehensive transformation → experimental features
 
 ## Deployment Status
 
