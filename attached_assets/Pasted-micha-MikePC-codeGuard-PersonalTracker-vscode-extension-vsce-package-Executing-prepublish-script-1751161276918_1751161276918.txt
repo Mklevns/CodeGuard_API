@@ -1,0 +1,289 @@
+micha@MikePC:~/codeGuard/PersonalTracker/vscode-extension$ vsce package
+Executing prepublish script 'npm run vscode:prepublish'...
+
+> codeguard@0.2.0 vscode:prepublish
+> npm run compile
+
+
+> codeguard@0.2.0 compile
+> tsc -p ./
+
+src/api.ts:259:9 - error TS1128: Declaration or statement expected.
+
+259         }, {
+            ~
+
+src/api.ts:259:10 - error TS1128: Declaration or statement expected.
+
+259         }, {
+             ~
+
+src/api.ts:261:10 - error TS1128: Declaration or statement expected.
+
+261         });
+             ~
+
+src/api.ts:263:5 - error TS1128: Declaration or statement expected.
+
+263     }
+        ~
+
+src/api.ts:265:5 - error TS1434: Unexpected keyword or identifier.
+
+265     async improveProject(files: CodeFile[], auditResults: any): Promise<any> {
+        ~~~~~
+
+src/api.ts:265:31 - error TS1005: ',' expected.
+
+265     async improveProject(files: CodeFile[], auditResults: any): Promise<any> {
+                                  ~
+
+src/api.ts:265:42 - error TS1011: An element access expression should take an argument.
+
+265     async improveProject(files: CodeFile[], auditResults: any): Promise<any> {
+
+
+src/api.ts:265:57 - error TS1005: ',' expected.
+
+265     async improveProject(files: CodeFile[], auditResults: any): Promise<any> {
+                                                            ~
+
+src/api.ts:265:63 - error TS1005: ';' expected.
+
+265     async improveProject(files: CodeFile[], auditResults: any): Promise<any> {
+                                                                  ~
+
+src/api.ts:266:15 - error TS1005: ':' expected.
+
+266         const aiProvider = this.configManager.getAiProvider();
+                  ~~~~~~~~~~
+
+src/api.ts:266:62 - error TS1005: ',' expected.
+
+266         const aiProvider = this.configManager.getAiProvider();
+                                                                 ~
+
+src/api.ts:267:15 - error TS1005: ':' expected.
+
+267         const aiApiKey = await this.configManager.getCurrentAiApiKey();
+                  ~~~~~~~~
+
+src/api.ts:267:71 - error TS1005: ',' expected.
+
+267         const aiApiKey = await this.configManager.getCurrentAiApiKey();
+                                                                          ~
+
+src/api.ts:269:15 - error TS1005: ':' expected.
+
+269         const response = await this.client.post('/improve/project', {
+                  ~~~~~~~~
+
+src/api.ts:274:11 - error TS1005: ',' expected.
+
+274         });
+              ~
+
+src/api.ts:275:16 - error TS1005: ':' expected.
+
+275         return response.data;
+                   ~~~~~~~~
+
+src/api.ts:275:29 - error TS1005: ',' expected.
+
+275         return response.data;
+                                ~
+
+src/api.ts:278:5 - error TS1434: Unexpected keyword or identifier.
+
+278     async bulkFix(originalCode: string, filename: string, fixType: string, issues: any[]): Promise<any> {
+        ~~~~~
+
+src/api.ts:278:31 - error TS1005: ',' expected.
+
+278     async bulkFix(originalCode: string, filename: string, fixType: string, issues: any[]): Promise<any> {
+                                  ~
+
+src/api.ts:278:49 - error TS1005: ',' expected.
+
+278     async bulkFix(originalCode: string, filename: string, fixType: string, issues: any[]): Promise<any> {
+                                                    ~
+
+src/api.ts:278:66 - error TS1005: ',' expected.
+
+278     async bulkFix(originalCode: string, filename: string, fixType: string, issues: any[]): Promise<any> {
+                                                                     ~
+
+src/api.ts:278:82 - error TS1005: ',' expected.
+
+278     async bulkFix(originalCode: string, filename: string, fixType: string, issues: any[]): Promise<any> {
+                                                                                     ~
+
+src/api.ts:278:88 - error TS1011: An element access expression should take an argument.
+
+278     async bulkFix(originalCode: string, filename: string, fixType: string, issues: any[]): Promise<any> {
+
+
+src/api.ts:278:90 - error TS1005: ';' expected.
+
+278     async bulkFix(originalCode: string, filename: string, fixType: string, issues: any[]): Promise<any> {
+                                                                                             ~
+
+src/api.ts:279:15 - error TS1005: ':' expected.
+
+279         const aiProvider = this.configManager.getAiProvider();
+                  ~~~~~~~~~~
+
+src/api.ts:279:62 - error TS1005: ',' expected.
+
+279         const aiProvider = this.configManager.getAiProvider();
+                                                                 ~
+
+src/api.ts:280:15 - error TS1005: ':' expected.
+
+280         const aiApiKey = await this.configManager.getCurrentAiApiKey();
+                  ~~~~~~~~
+
+src/api.ts:280:71 - error TS1005: ',' expected.
+
+280         const aiApiKey = await this.configManager.getCurrentAiApiKey();
+                                                                          ~
+
+src/api.ts:282:15 - error TS1005: ':' expected.
+
+282         const response = await this.client.post('/improve/bulk-fix', {
+                  ~~~~~~~~
+
+src/api.ts:291:11 - error TS1005: ',' expected.
+
+291         });
+              ~
+
+src/api.ts:292:16 - error TS1005: ':' expected.
+
+292         return response.data;
+                   ~~~~~~~~
+
+src/api.ts:292:29 - error TS1005: ',' expected.
+
+292         return response.data;
+                                ~
+
+src/api.ts:295:5 - error TS1434: Unexpected keyword or identifier.
+
+295     async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
+        ~~~~~
+
+src/api.ts:295:42 - error TS1005: ',' expected.
+
+295     async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
+                                             ~
+
+src/api.ts:295:53 - error TS1011: An element access expression should take an argument.
+
+295     async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
+
+
+src/api.ts:295:62 - error TS1005: ',' expected.
+
+295     async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
+                                                                 ~
+
+src/api.ts:295:94 - error TS1005: ',' expected.
+
+295     async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
+                                                                                                 ~
+
+src/api.ts:295:126 - error TS1005: ',' expected.
+
+295     async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
+                                                                                                                                 ~
+
+src/api.ts:295:143 - error TS1005: ';' expected.
+
+295     async generateImprovementReport(files: CodeFile[], format: string = 'markdown', includeAi: boolean = true, applyFiltering: boolean = true): Promise<any> {
+                                                                                                                                                  ~
+
+src/api.ts:296:15 - error TS1005: ':' expected.
+
+296         const response = await this.client.post('/reports/improvement-analysis', {
+                  ~~~~~~~~
+
+src/api.ts:303:11 - error TS1005: ',' expected.
+
+303         });
+              ~
+
+src/api.ts:304:16 - error TS1005: ':' expected.
+
+304         return response.data;
+                   ~~~~~~~~
+
+src/api.ts:304:29 - error TS1005: ',' expected.
+
+304         return response.data;
+                                ~
+
+src/api.ts:307:5 - error TS1434: Unexpected keyword or identifier.
+
+307     async auditAndImprove(files: CodeFile[], options?: AuditOptions): Promise<any> {
+        ~~~~~
+
+src/api.ts:307:32 - error TS1005: ',' expected.
+
+307     async auditAndImprove(files: CodeFile[], options?: AuditOptions): Promise<any> {
+                                   ~
+
+src/api.ts:307:43 - error TS1011: An element access expression should take an argument.
+
+307     async auditAndImprove(files: CodeFile[], options?: AuditOptions): Promise<any> {
+
+
+src/api.ts:307:54 - error TS1109: Expression expected.
+
+307     async auditAndImprove(files: CodeFile[], options?: AuditOptions): Promise<any> {
+                                                         ~
+
+src/api.ts:307:69 - error TS1005: ';' expected.
+
+307     async auditAndImprove(files: CodeFile[], options?: AuditOptions): Promise<any> {
+                                                                        ~
+
+src/api.ts:308:15 - error TS1005: ':' expected.
+
+308         const requestData = {
+                  ~~~~~~~~~~~
+
+src/api.ts:315:10 - error TS1005: ',' expected.
+
+315         };
+             ~
+
+src/api.ts:317:15 - error TS1005: ':' expected.
+
+317         const response = await this.client.post('/audit-and-improve', requestData);
+                  ~~~~~~~~
+
+src/api.ts:317:83 - error TS1005: ',' expected.
+
+317         const response = await this.client.post('/audit-and-improve', requestData);
+                                                                                      ~
+
+src/api.ts:318:16 - error TS1005: ':' expected.
+
+318         return response.data;
+                   ~~~~~~~~
+
+src/api.ts:318:29 - error TS1005: ',' expected.
+
+318         return response.data;
+                                ~
+
+src/api.ts:320:1 - error TS1128: Declaration or statement expected.
+
+320 }
+    ~
+
+
+Found 55 errors in the same file, starting at: src/api.ts:259
+
+ ERROR  npm failed with exit code 2
