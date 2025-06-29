@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from openai import OpenAI
 from models import Issue, Fix, CodeFile
 from llm_prompt_generator import get_llm_prompt_generator
+from clean_code_prompt_enhancer import enhance_prompt_for_clean_code_output
 
 @dataclass
 class CodeImprovementRequest:
@@ -603,14 +604,20 @@ Always provide complete, working code in the improved_code field."""
         
         # Use custom system prompt if available
         if custom_prompt_response:
-            system_prompt = custom_prompt_response.system_prompt
+            base_system_prompt = custom_prompt_response.system_prompt
             confidence_boost = custom_prompt_response.confidence_boost
         else:
-            system_prompt = ("You are an expert Python developer specializing in ML/RL code improvements. "
-                           "Apply the suggested fixes while maintaining code functionality and readability. "
-                           "Return your response in JSON format with 'improved_code', 'applied_fixes', "
-                           "'improvement_summary', 'confidence_score', and 'warnings' fields.")
+            base_system_prompt = ("You are an expert Python developer specializing in ML/RL code improvements. "
+                                 "Apply the suggested fixes while maintaining code functionality and readability.")
             confidence_boost = 0.0
+        
+        # Enhanced prompt for clean code output
+        system_prompt = enhance_prompt_for_clean_code_output(
+            base_system_prompt,
+            request.original_code,
+            request.issues,
+            "complete_replacement"
+        )
         
         prompt = self._build_improvement_prompt(request)
         
@@ -654,11 +661,33 @@ Always provide complete, working code in the improved_code field."""
         
         # Use custom prompt if available, otherwise use default
         if custom_prompt_response:
-            prompt = custom_prompt_response.system_prompt + "\n\n" + self._build_deepseek_function_prompt(request)
+            base_prompt = custom_prompt_response.system_prompt + "\n\n" + self._build_deepseek_function_prompt(request)
             confidence_boost = custom_prompt_response.confidence_boost
         else:
-            prompt = self._build_deepseek_function_prompt(request)
+            base_prompt = self._build_deepseek_function_prompt(request)
             confidence_boost = 0.0
+        
+        # Enhanced prompt for clean code output with DeepSeek specifics
+        enhanced_prompt = enhance_prompt_for_clean_code_output(
+            base_prompt,
+            request.original_code,
+            request.issues,
+            "complete_replacement"
+        )
+        
+        # Add DeepSeek-specific JSON format requirements
+        prompt = enhanced_prompt + """
+
+DEEPSEEK SPECIFIC OUTPUT:
+Return valid JSON with these exact fields:
+- improved_code: Complete corrected code file (NOT original + fixes)
+- applied_fixes: Array of fix descriptions
+- improvement_summary: Summary of changes
+- confidence_score: 0.0-1.0
+- warnings: Array of warnings
+
+CRITICAL: The improved_code must be the entire corrected file, ready to replace the original.
+"""
         
         try:
             response_text = self._call_deepseek_r1(prompt, request.ai_api_key)

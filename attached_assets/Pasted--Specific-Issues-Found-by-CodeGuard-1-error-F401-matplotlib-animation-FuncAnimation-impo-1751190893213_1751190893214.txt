@@ -1,0 +1,43 @@
+
+**Specific Issues Found by CodeGuard:**
+1. error: F401: 'matplotlib.animation.FuncAnimation' imported but unused (Line 13)
+2. error: F401: 'pathlib.Path' imported but unused (Line 15)
+3. error: F401: 'janus.training.ppo.world_model_trainer.WorldModelPPOTrainer' imported but unused (Line 19)
+4. error: F401: 'janus.training.ppo.world_model_trainer.WorldModelConfig' imported but unused (Line 19)
+5. error: F401: 'janus.training.ppo.config.PPOConfig' imported but unused (Line 23)
+6. error: F401: 'janus.agents.ppo_agent.PPOAgent' imported but unused (Line 24)
+7. error: F401: 'janus.agents.ppo_agent.NetworkConfig' imported but unused (Line 24)
+8. style: E501: line too long (80 > 79 characters) (Line 27)
+9. style: E501: line too long (95 > 79 characters) (Line 79)
+10. style: E501: line too long (88 > 79 characters) (Line 92)
+
+**Specific Fixes to Apply:**
+1. Remove unused import: from matplotlib.animation import FuncAnimation
+2. Remove unused import: from pathlib import Path
+3. Remove unused import: from janus.training.ppo.world_model_trainer import (
+4. Remove unused import: from janus.training.ppo.world_model_trainer import (
+5. Remove unused import: from janus.training.ppo.config import PPOConfig
+6. Remove unused import: from janus.agents.ppo_agent import PPOAgent, NetworkConfig
+7. Remove unused import: from janus.agents.ppo_agent import PPOAgent, NetworkConfig
+8. Break long line into multiple lines
+9. Break long line into multiple lines
+10. Break long line into multiple lines
+
+**Requirements:**
+1. Start with the EXACT original code above
+2. Apply ONLY the specific fixes listed
+3. Keep the same function structure and logic
+4. Do not add new functionality unless fixing a bug
+5. Preserve the original code's intent and behavior
+
+**Analysis Tools Available:**
+- analyze_code_security: For security vulnerability fixes
+- generate_ml_best_practices: For ML/RL specific improvements
+- optimize_code_performance: For performance fixes
+
+**Return JSON format:**
+- improved_code: The EXACT original code with ONLY the listed fixes applied
+- applied_fixes: Descriptions of what was actually changed
+- improvement_summary: What was fixed in the original code
+- confidence_score: 0.0-1.0
+- warnings: Any warnings or considerations

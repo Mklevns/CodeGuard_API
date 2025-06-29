@@ -204,7 +204,8 @@ DEEPSEEK SPECIFIC REQUIREMENTS:
 - Must include JSON response format instructions
 - Should leverage DeepSeek's reasoning capabilities
 - Include structured output requirements
-- Add timeout considerations for complex analysis"""
+- Add timeout considerations for complex analysis
+- CRITICAL: Return ONLY the fixed code in improved_code field, not original + fixed"""
         
         return request
     
