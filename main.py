@@ -467,9 +467,13 @@ async def terms_of_service():
 @app.post("/improve/code")
 async def improve_code_with_ai(request: dict):
     """
-    Use AI (OpenAI, Gemini, or Claude) to implement CodeGuard suggestions and improve code quality.
+    TARGETED CODE IMPROVEMENT: Apply AI fixes to specific known issues in existing code.
     
-    Supports multiple AI providers with fallback functionality.
+    Use this when you already have identified issues and want focused improvements.
+    - Requires pre-existing issues list
+    - Applies fixes to specific problems
+    - Preserves original code structure
+    - Fast, targeted improvements
     """
     try:
         # Extract request data
@@ -480,9 +484,15 @@ async def improve_code_with_ai(request: dict):
         improvement_level = request.get("improvement_level", "moderate")
         ai_provider = request.get("ai_provider", "openai")
         ai_api_key = request.get("ai_api_key")
+        target_lines = request.get("target_lines", [])  # NEW: Specific lines to focus on
+        preserve_structure = request.get("preserve_structure", True)  # NEW: Keep original structure
         
         if not original_code:
             raise HTTPException(status_code=400, detail="Code content is required")
+        
+        # TARGETED IMPROVEMENT: Require issues to be provided
+        if not issues:
+            raise HTTPException(status_code=400, detail="Issues list is required for targeted improvement. Use /audit-and-improve for discovery.")
         
         # Convert dict issues/fixes to model objects for compatibility
         from models import Issue, Fix
@@ -1172,9 +1182,14 @@ async def improve_entire_project(request: dict):
 @app.post("/audit-and-improve")
 async def audit_and_improve_combined(request: AuditRequest):
     """
-    Combined endpoint that performs CodeGuard audit and ChatGPT improvements in one call.
+    COMPREHENSIVE CODE ANALYSIS: Full audit + intelligent AI improvements in one workflow.
     
-    This is the most comprehensive endpoint for getting both analysis and AI-powered fixes.
+    Use this for complete code transformation and enhancement:
+    - Discovers ALL issues automatically (no pre-existing list needed)
+    - Applies advanced AI reasoning and best practices
+    - Restructures code for optimal quality
+    - Comprehensive analysis with telemetry tracking
+    - Best for new code review or major refactoring
     """
     try:
         # Perform initial audit WITHOUT false positive filtering to get all issues
