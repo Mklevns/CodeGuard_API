@@ -379,26 +379,68 @@ def evaluate_model():
                 fix.filename === issue.filename
             );
 
-            issueDiv.innerHTML = `
-                <div class="flex justify-between items-start mb-2">
-                    <h4 class="font-semibold text-gray-800">${this.escapeHtml(issue.type || 'Code Issue')}</h4>
-                    <div class="flex space-x-2">
-                        <span class="px-2 py-1 text-xs rounded ${this.getSeverityBadgeClass(issue.severity)}">
-                            ${issue.severity || 'low'}
-                        </span>
-                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
-                            ${issue.source || 'unknown'}
-                        </span>
-                    </div>
-                </div>
-                <p class="text-gray-700 mb-2">${this.escapeHtml(issue.description)}</p>
-                <div class="text-sm text-gray-600 mb-3">
-                    <strong>File:</strong> ${this.escapeHtml(issue.filename)} 
-                    <strong>Line:</strong> ${issue.line}
-                    ${issue.column ? `<strong>Column:</strong> ${issue.column}` : ''}
-                </div>
-                ${relatedFixes.length > 0 ? this.renderFixes(relatedFixes) : ''}
-            `;
+            const header = document.createElement('div');
+            header.className = "flex justify-between items-start mb-2";
+
+            const title = document.createElement('h4');
+            title.className = "font-semibold text-gray-800";
+            title.textContent = issue.type || 'Code Issue';
+
+            const badges = document.createElement('div');
+            badges.className = "flex space-x-2";
+
+            const severitySpan = document.createElement('span');
+            severitySpan.className = `px-2 py-1 text-xs rounded ${this.getSeverityBadgeClass(issue.severity)}`;
+            severitySpan.textContent = issue.severity || 'low';
+
+            const sourceSpan = document.createElement('span');
+            sourceSpan.className = "px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded";
+            sourceSpan.textContent = issue.source || 'unknown';
+
+            badges.append(severitySpan, sourceSpan);
+            header.append(title, badges);
+            issueDiv.appendChild(header);
+
+            // Description
+            const desc = document.createElement('p');
+            desc.className = "text-gray-700 mb-2";
+            desc.textContent = issue.description;
+            issueDiv.appendChild(desc);
+
+            // File/Line
+            const meta = document.createElement('div');
+            meta.className = "text-sm text-gray-600 mb-3";
+            
+            const fileLabel = document.createElement('strong');
+            fileLabel.textContent = 'File: ';
+            meta.appendChild(fileLabel);
+            
+            const fileText = document.createTextNode(issue.filename);
+            meta.appendChild(fileText);
+            
+            const lineLabel = document.createElement('strong');
+            lineLabel.textContent = ' Line: ';
+            meta.appendChild(lineLabel);
+            
+            const lineText = document.createTextNode(String(issue.line));
+            meta.appendChild(lineText);
+            
+            if (issue.column) {
+                const columnLabel = document.createElement('strong');
+                columnLabel.textContent = ' Column: ';
+                meta.appendChild(columnLabel);
+                
+                const columnText = document.createTextNode(String(issue.column));
+                meta.appendChild(columnText);
+            }
+            
+            issueDiv.appendChild(meta);
+
+            // Fixes
+            if (relatedFixes.length > 0) {
+                const fixes = this.renderFixes(relatedFixes);
+                issueDiv.insertAdjacentHTML('beforeend', fixes);
+            }
 
             issuesList.appendChild(issueDiv);
         });
