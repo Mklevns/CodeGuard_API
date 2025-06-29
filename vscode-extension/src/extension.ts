@@ -48,6 +48,30 @@ export function activate(context: vscode.ExtensionContext) {
         await showFixSelectionMenu();
     });
     
+    const analyzeRepositoryCommand = vscode.commands.registerCommand('codeguard.analyzeRepository', async () => {
+        await analyzeCurrentRepository();
+    });
+    
+    const improveWithContextCommand = vscode.commands.registerCommand('codeguard.improveWithContext', async () => {
+        await improveWithRepositoryContext();
+    });
+    
+    const showCacheStatsCommand = vscode.commands.registerCommand('codeguard.showCacheStats', async () => {
+        await showCacheStatistics();
+    });
+    
+    const clearCacheCommand = vscode.commands.registerCommand('codeguard.clearCache', async () => {
+        await clearAnalysisCache();
+    });
+    
+    const configureRulesCommand = vscode.commands.registerCommand('codeguard.configureRules', async () => {
+        await showRuleConfiguration();
+    });
+    
+    const systemHealthCommand = vscode.commands.registerCommand('codeguard.systemHealth', async () => {
+        await showSystemHealth();
+    });
+    
     const bulkFixCommand = vscode.commands.registerCommand('codeguard.bulkFixByType', async () => {
         await showBulkFixMenu();
     });
@@ -655,6 +679,262 @@ async function applyTargetedFix(editor: vscode.TextEditor, improvement: any, dia
         
     } catch (error) {
         vscode.window.showErrorMessage(`Failed to apply targeted fix: ${error}`);
+    }
+}
+
+async function analyzeCurrentRepository() {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        vscode.window.showWarningMessage('No workspace folder open. Please open a Git repository.');
+        return;
+    }
+
+    try {
+        // Try to get Git repository URL
+        const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+        const git = gitExtension?.getAPI(1);
+        const repo = git?.repositories[0];
+        
+        if (!repo) {
+            vscode.window.showWarningMessage('No Git repository detected in current workspace.');
+            return;
+        }
+
+        const remoteUrl = repo.state.remotes[0]?.fetchUrl;
+        if (!remoteUrl || !remoteUrl.includes('github.com')) {
+            vscode.window.showWarningMessage('Current repository is not a GitHub repository.');
+            return;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Analyzing GitHub Repository",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ increment: 20, message: "Connecting to repository..." });
+            
+            const analysis = await api.analyzeRepository(remoteUrl);
+            
+            progress.report({ increment: 100, message: "Analysis complete!" });
+
+            const summary = `Repository Analysis Complete:
+• Language: ${analysis.repository_info.language}
+• Frameworks: ${analysis.detected_frameworks.join(', ')}
+• Python Files: ${analysis.file_structure.python_files}
+• Dependencies: ${analysis.file_structure.dependencies?.length || 0}
+• Configuration Files: ${analysis.file_structure.config_files?.length || 0}`;
+
+            vscode.window.showInformationMessage(summary);
+        });
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Repository analysis failed: ${error}`);
+    }
+}
+
+async function improveWithRepositoryContext() {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (!activeEditor) {
+        vscode.window.showWarningMessage('No active file to improve');
+        return;
+    }
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        vscode.window.showWarningMessage('No workspace folder open');
+        return;
+    }
+
+    try {
+        const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+        const git = gitExtension?.getAPI(1);
+        const repo = git?.repositories[0];
+        
+        if (!repo) {
+            vscode.window.showWarningMessage('No Git repository detected. Repository context requires a Git repository.');
+            return;
+        }
+
+        const remoteUrl = repo.state.remotes[0]?.fetchUrl;
+        if (!remoteUrl || !remoteUrl.includes('github.com')) {
+            vscode.window.showWarningMessage('Repository context requires a GitHub repository.');
+            return;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Improving with Repository Context",
+            cancellable: false
+        }, async (progress) => {
+            progress.report({ increment: 20, message: "Analyzing repository context..." });
+            
+            const filename = activeEditor.document.fileName.split('/').pop() || 'untitled.py';
+            const content = activeEditor.document.getText();
+            const relativePath = vscode.workspace.asRelativePath(activeEditor.document.fileName);
+            
+            progress.report({ increment: 50, message: "Getting context-aware improvements..." });
+
+            const improvement = await api.improveWithRepositoryContext(
+                remoteUrl,
+                content,
+                filename,
+                relativePath
+            );
+            
+            progress.report({ increment: 100, message: "Context-aware improvement complete!" });
+
+            const apply = await vscode.window.showInformationMessage(
+                `Context-Aware Improvement Complete:\n${improvement.improvement_summary}\n\nRelated Files Used: ${improvement.related_files_used}\nConfidence: ${Math.round(improvement.confidence_score * 100)}%`,
+                'Preview Changes', 'Apply Improvement', 'Dismiss'
+            );
+
+            if (apply === 'Preview Changes') {
+                const doc = await vscode.workspace.openTextDocument({
+                    content: improvement.improved_code,
+                    language: 'python'
+                });
+                await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+                
+            } else if (apply === 'Apply Improvement') {
+                const edit = new vscode.WorkspaceEdit();
+                const fullRange = new vscode.Range(0, 0, activeEditor.document.lineCount, 0);
+                edit.replace(activeEditor.document.uri, fullRange, improvement.improved_code);
+                await vscode.workspace.applyEdit(edit);
+                
+                vscode.window.showInformationMessage('Context-aware improvement applied successfully');
+            }
+        });
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Context-aware improvement failed: ${error}`);
+    }
+}
+
+async function showCacheStatistics() {
+    try {
+        const stats = await api.getCacheStats();
+        
+        const message = `Analysis Cache Statistics:
+• Cache Entries: ${stats.file_cache.entries}
+• Valid Entries: ${stats.file_cache.valid_entries}
+• Storage Used: ${stats.file_cache.size_mb} MB
+• TTL Hours: ${stats.file_cache.ttl_hours}
+• Performance Impact: ${stats.performance_impact.estimated_speedup}`;
+
+        const action = await vscode.window.showInformationMessage(
+            message,
+            'Clear Cache', 'Dismiss'
+        );
+
+        if (action === 'Clear Cache') {
+            await clearAnalysisCache();
+        }
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to load cache statistics: ${error}`);
+    }
+}
+
+async function clearAnalysisCache() {
+    try {
+        const confirm = await vscode.window.showWarningMessage(
+            'Are you sure you want to clear the analysis cache? This will remove all cached results.',
+            'Clear Cache', 'Cancel'
+        );
+
+        if (confirm === 'Clear Cache') {
+            await api.clearCache();
+            vscode.window.showInformationMessage('Analysis cache cleared successfully');
+        }
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to clear cache: ${error}`);
+    }
+}
+
+async function showRuleConfiguration() {
+    try {
+        const config = await api.getRuleConfiguration();
+        
+        const ruleSetOptions = Object.keys(config.rule_sets).map(name => ({
+            label: `${name} (${config.rule_sets[name].length} rules)`,
+            description: `Toggle ${name} rule set`,
+            ruleSet: name
+        }));
+
+        const action = await vscode.window.showQuickPick([
+            { label: 'View Configuration Summary', description: 'Show current rule configuration' },
+            { label: 'Enable Rule Set', description: 'Enable a complete rule set' },
+            { label: 'Disable Rule Set', description: 'Disable a complete rule set' },
+            ...ruleSetOptions.map(opt => ({ ...opt, label: `Configure: ${opt.label}` }))
+        ], {
+            placeHolder: 'Select rule configuration action'
+        });
+
+        if (!action) return;
+
+        if (action.label === 'View Configuration Summary') {
+            const summary = `Rule Configuration:
+• Total Rules: ${config.configuration.total_rules}
+• Enabled Rules: ${config.configuration.enabled_rules}
+• Disabled Rules: ${config.configuration.disabled_rules}
+
+Rules by Severity:
+${Object.entries(config.configuration.by_severity).map(([severity, count]) => `• ${severity}: ${count}`).join('\n')}
+
+Available Rule Sets:
+${Object.entries(config.rule_sets).map(([name, rules]) => `• ${name}: ${rules.length} rules`).join('\n')}`;
+
+            vscode.window.showInformationMessage(summary);
+
+        } else if (action.label === 'Enable Rule Set' || action.label === 'Disable Rule Set') {
+            const ruleSet = await vscode.window.showQuickPick(
+                Object.keys(config.rule_sets).map(name => ({ label: name, description: `${config.rule_sets[name].length} rules` })),
+                { placeHolder: `Select rule set to ${action.label.includes('Enable') ? 'enable' : 'disable'}` }
+            );
+
+            if (ruleSet) {
+                const enabled = action.label.includes('Enable');
+                await api.toggleRuleSet(ruleSet.label, enabled);
+                vscode.window.showInformationMessage(`Rule set '${ruleSet.label}' ${enabled ? 'enabled' : 'disabled'}`);
+            }
+        }
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to load rule configuration: ${error}`);
+    }
+}
+
+async function showSystemHealth() {
+    try {
+        const health = await api.getSystemHealth();
+        
+        const status = health.status.toUpperCase();
+        const message = `System Health: ${status}
+
+Analysis Engine: ${health.analysis_engine.status}
+• Tools Available: ${health.analysis_engine.tools_available}
+• Semantic Analysis: ${health.analysis_engine.semantic_analysis}
+• Caching: ${health.analysis_engine.caching}
+
+Cache System: ${health.cache_system.status}
+• Entries: ${health.cache_system.entries}
+• Size: ${health.cache_system.size_mb} MB
+
+Rule System: ${health.rule_system.status}
+• Total Rules: ${health.rule_system.total_rules}
+• Enabled Rules: ${health.rule_system.enabled_rules}
+
+Authentication: ${health.authentication.status}
+• Mode: ${health.authentication.mode}
+
+Version: ${health.version}
+Environment: ${health.environment}`;
+
+        vscode.window.showInformationMessage(message);
+
+    } catch (error) {
+        vscode.window.showErrorMessage(`Failed to load system health: ${error}`);
     }
 }
 

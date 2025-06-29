@@ -96,6 +96,13 @@ class CodeGuardPlayground {
         document.getElementById('clearCacheBtn').addEventListener('click', () => this.clearCache());
         document.getElementById('ruleConfigBtn').addEventListener('click', () => this.showRuleConfig());
         document.getElementById('systemHealthBtn').addEventListener('click', () => this.showSystemHealth());
+        
+        // GitHub context buttons
+        document.getElementById('analyzeRepoBtn').addEventListener('click', () => this.analyzeRepository());
+        document.getElementById('loadFileBtn').addEventListener('click', () => this.loadFileFromRepo());
+        document.getElementById('contextImproveBtn').addEventListener('click', () => this.improveWithContext());
+        document.getElementById('clearRepoBtn').addEventListener('click', () => this.clearRepositoryContext());
+        document.getElementById('repoFileSelect').addEventListener('change', () => this.onFileSelected());
     }
 
     loadExampleCode() {
