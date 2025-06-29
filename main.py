@@ -1278,23 +1278,28 @@ if __name__ == "__main__":
     
     print(f"Starting CodeGuard API on 0.0.0.0:{port} (environment: {environment})")
     
-    if environment == "development":
-        # Use import string for reload functionality in development
-        uvicorn.run(
-            "main:app",
-            host="0.0.0.0",
-            port=port,
-            reload=True,
-            log_level="info",
-            access_log=True
-        )
-    else:
-        # Use app object directly in production for better performance
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=port,
-            reload=False,
-            log_level="info",
-            access_log=True
-        )
+    try:
+        if environment == "development":
+            # Use import string for reload functionality in development
+            uvicorn.run(
+                "main:app",
+                host="0.0.0.0",
+                port=port,
+                reload=True,
+                log_level="info",
+                access_log=True
+            )
+        else:
+            # Use app object directly in production for better performance
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=port,
+                reload=False,
+                log_level="info",
+                access_log=True
+            )
+    except Exception as e:
+        print(f"Failed to start CodeGuard API: {e}")
+        import sys
+        sys.exit(1)
