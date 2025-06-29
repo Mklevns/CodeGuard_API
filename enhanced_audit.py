@@ -8,12 +8,14 @@ import os
 import re
 import json
 import difflib
+import uuid
 from typing import List, Dict, Tuple, Optional
 from models import AuditRequest, AuditResponse, Issue, Fix
 from rule_engine import MLRLRuleEngine
 from rule_loader import CustomRuleEngine
 from rl_environment_plugin import rl_env_analyzer, rl_config_analyzer
 from false_positive_filter import get_false_positive_filter
+from semantic_analyzer import analyze_code_semantically, SemanticFalsePositiveFilter
 
 
 class EnhancedAuditEngine:
