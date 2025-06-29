@@ -29,6 +29,13 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     Raises:
         HTTPException: If authentication fails
     """
+    import os
+    
+    # In development mode, allow access without credentials for playground
+    if os.getenv("ENVIRONMENT", "development") == "development":
+        if not credentials:
+            return True
+    
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -39,7 +46,6 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     stored_api_key = get_api_key_from_env()
     if not stored_api_key:
         # In production, require API key. In development, allow without key.
-        import os
         if os.getenv("ENVIRONMENT", "development") == "production":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

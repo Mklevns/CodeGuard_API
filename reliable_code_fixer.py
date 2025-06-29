@@ -24,6 +24,7 @@ class ReliableCodeFixer:
             'security_fixes': {
                 'pickle.load(': 'torch.load(',
                 'import pickle': 'import torch',
+                'with open(': 'torch.load(',
                 'eval(': '# SECURITY: eval() removed - use safe parsing',
                 'exec(': '# SECURITY: exec() removed - use safe execution'
             },
