@@ -12,7 +12,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from openai import OpenAI
 from models import Issue, Fix, CodeFile
-from adaptive_prompt_generator import get_adaptive_prompt_generator
+from llm_prompt_generator import get_llm_prompt_generator
 
 @dataclass
 class CodeImprovementRequest:
@@ -564,26 +564,23 @@ Always provide complete, working code in the improved_code field."""
         """
         ai_provider = request.ai_provider.lower() if request.ai_provider else "openai"
         
-        # Generate custom prompt based on audit results
-        prompt_generator = get_adaptive_prompt_generator()
+        # Generate custom prompt based on audit results using LLM
+        prompt_generator = get_llm_prompt_generator()
         code_files = [CodeFile(filename=request.filename, content=request.original_code)]
         
-        custom_prompt_data = prompt_generator.generate_custom_prompt(
+        custom_prompt_response = prompt_generator.generate_custom_prompt(
             issues=request.issues,
             fixes=request.fixes,
             code_files=code_files,
             ai_provider=ai_provider
         )
         
-        # Store custom prompt for use in provider methods
-        request._custom_prompt_data = custom_prompt_data
-        
         try:
-            # Route to appropriate AI provider
+            # Route to appropriate AI provider with custom prompt
             if ai_provider == "deepseek":
-                return self._improve_with_deepseek(request)
+                return self._improve_with_deepseek(request, custom_prompt_response)
             elif ai_provider == "openai":
-                return self._improve_with_openai(request)
+                return self._improve_with_openai(request, custom_prompt_response)
             else:
                 # Default to OpenAI if provider not recognized
                 return self._improve_with_openai(request)
@@ -591,7 +588,7 @@ Always provide complete, working code in the improved_code field."""
         except Exception as e:
             return self._handle_improvement_error(request, str(e))
     
-    def _improve_with_openai(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
+    def _improve_with_openai(self, request: CodeImprovementRequest, custom_prompt_response=None) -> CodeImprovementResponse:
         """Use OpenAI GPT-4o for code improvement."""
         if not self.openai_client and not request.ai_api_key:
             return self._fallback_improvement(request)
@@ -604,6 +601,17 @@ Always provide complete, working code in the improved_code field."""
         else:
             return self._fallback_improvement(request)
         
+        # Use custom system prompt if available
+        if custom_prompt_response:
+            system_prompt = custom_prompt_response.system_prompt
+            confidence_boost = custom_prompt_response.confidence_boost
+        else:
+            system_prompt = ("You are an expert Python developer specializing in ML/RL code improvements. "
+                           "Apply the suggested fixes while maintaining code functionality and readability. "
+                           "Return your response in JSON format with 'improved_code', 'applied_fixes', "
+                           "'improvement_summary', 'confidence_score', and 'warnings' fields.")
+            confidence_boost = 0.0
+        
         prompt = self._build_improvement_prompt(request)
         
         response = client.chat.completions.create(
@@ -611,10 +619,7 @@ Always provide complete, working code in the improved_code field."""
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an expert Python developer specializing in ML/RL code improvements. "
-                    "Apply the suggested fixes while maintaining code functionality and readability. "
-                    "Return your response in JSON format with 'improved_code', 'applied_fixes', "
-                    "'improvement_summary', 'confidence_score', and 'warnings' fields."
+                    "content": system_prompt
                 },
                 {
                     "role": "user",
@@ -632,15 +637,19 @@ Always provide complete, working code in the improved_code field."""
         else:
             result = {}
         
+        # Apply confidence boost from custom prompt
+        base_confidence = float(result.get("confidence_score", 0.5))
+        final_confidence = min(base_confidence + confidence_boost, 1.0)
+        
         return CodeImprovementResponse(
             improved_code=result.get("improved_code", request.original_code),
             applied_fixes=result.get("applied_fixes", []),
             improvement_summary=result.get("improvement_summary", "No improvements applied"),
-            confidence_score=float(result.get("confidence_score", 0.5)),
+            confidence_score=final_confidence,
             warnings=result.get("warnings", [])
         )
     
-    def _improve_with_deepseek(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
+    def _improve_with_deepseek(self, request: CodeImprovementRequest, custom_prompt_response=None) -> CodeImprovementResponse:
         """Use DeepSeek with Function Calling for enhanced code improvement."""
         prompt = self._build_deepseek_function_prompt(request)
         
