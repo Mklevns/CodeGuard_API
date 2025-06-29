@@ -2256,6 +2256,183 @@ async def get_repository_heatmap():
             "error": f"Repository heatmap generation failed: {str(e)}"
         }
 
+@app.get("/context/related-files")
+async def get_related_files(file_path: str, limit: int = 5):
+    """
+    Get files that are frequently co-changed with the specified file using Git history analysis.
+    """
+    try:
+        if not git_context_retriever.is_available():
+            return {
+                "available": False,
+                "message": "Git repository not available for context analysis",
+                "related_files": []
+            }
+        
+        related_files = git_context_retriever.get_related_files(file_path, limit)
+        
+        return {
+            "available": True,
+            "file_path": file_path,
+            "related_files": related_files,
+            "analysis_method": "git_commit_history",
+            "total_found": len(related_files)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Related files analysis failed: {str(e)}")
+
+@app.get("/context/comprehensive")
+async def get_comprehensive_context(file_path: str, max_files: int = 5):
+    """
+    Get comprehensive context for a file including both co-changed files and dependencies.
+    """
+    try:
+        if not git_context_retriever.is_available():
+            return {
+                "available": False,
+                "message": "Git repository not available for comprehensive context analysis",
+                "context": {}
+            }
+        
+        context = git_context_retriever.get_comprehensive_context(file_path, max_files)
+        
+        # Calculate context statistics
+        total_lines = sum(len(content.split('\n')) for content in context.values())
+        file_types = {}
+        for file_path in context.keys():
+            ext = file_path.split('.')[-1] if '.' in file_path else 'unknown'
+            file_types[ext] = file_types.get(ext, 0) + 1
+        
+        return {
+            "available": True,
+            "target_file": file_path,
+            "context_files": list(context.keys()),
+            "context": context,
+            "statistics": {
+                "total_files": len(context),
+                "total_lines": total_lines,
+                "file_types": file_types
+            },
+            "analysis_methods": ["git_commit_history", "import_analysis", "priority_scoring"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Comprehensive context analysis failed: {str(e)}")
+
+@app.post("/improve/context-aware")
+async def context_aware_improvement(request: dict):
+    """
+    AI-powered code improvement enhanced with Git repository context for more intelligent suggestions.
+    
+    This endpoint combines:
+    - Static analysis results from CodeGuard
+    - Git history analysis for related files
+    - Import dependency analysis
+    - AI improvement with comprehensive repository context
+    """
+    try:
+        original_code = request.get("original_code", "")
+        filename = request.get("filename", "unknown.py")
+        ai_provider = request.get("ai_provider", "openai")
+        ai_api_key = request.get("ai_api_key")
+        include_git_context = request.get("include_git_context", True)
+        max_context_files = request.get("max_context_files", 5)
+        
+        if not original_code:
+            raise HTTPException(status_code=400, detail="Code content is required")
+        
+        # First, perform static analysis to identify issues
+        from models import AuditRequest, CodeFile
+        from enhanced_audit import EnhancedAuditEngine
+        
+        audit_request = AuditRequest(
+            files=[CodeFile(filename=filename, content=original_code)]
+        )
+        
+        audit_engine = EnhancedAuditEngine()
+        audit_response = audit_engine.analyze_code(audit_request)
+        
+        # Get Git context if requested and available
+        related_context = {}
+        context_summary = "No repository context available"
+        
+        if include_git_context and git_context_retriever.is_available():
+            try:
+                related_context = git_context_retriever.get_comprehensive_context(filename, max_context_files)
+                if related_context:
+                    context_files = list(related_context.keys())
+                    context_summary = f"Repository context loaded: {len(context_files)} related files including {', '.join(context_files[:3])}"
+                    if len(context_files) > 3:
+                        context_summary += f" and {len(context_files) - 3} more"
+            except Exception as e:
+                context_summary = f"Could not load repository context: {str(e)}"
+        
+        # Create improvement request with context
+        from chatgpt_integration import CodeImprovementRequest, get_code_improver
+        
+        improvement_request = CodeImprovementRequest(
+            original_code=original_code,
+            filename=filename,
+            issues=audit_response.issues,
+            fixes=audit_response.fixes,
+            improvement_level="moderate",
+            preserve_functionality=True,
+            ai_provider=ai_provider,
+            ai_api_key=ai_api_key
+        )
+        
+        # Perform AI improvement with context
+        code_improver = get_code_improver()
+        
+        # Build enhanced prompt with Git context if available
+        if related_context:
+            # Format related files for the prompt
+            related_files_data = [
+                {
+                    "filename": file_path,
+                    "path": file_path,
+                    "content": content,
+                    "reason": "Frequently co-changed or imported dependency",
+                    "relevance_score": 8.0 - i  # Higher score for earlier files
+                }
+                for i, (file_path, content) in enumerate(related_context.items())
+            ]
+            
+            # Use the enhanced _build_improvement_prompt with related files context
+            if ai_provider.lower() == "openai":
+                improvement_response = code_improver._improve_with_openai(improvement_request)
+            elif ai_provider.lower() == "deepseek":
+                improvement_response = code_improver._improve_with_deepseek(improvement_request)
+            else:
+                improvement_response = code_improver.improve_code(improvement_request)
+        else:
+            improvement_response = code_improver.improve_code(improvement_request)
+        
+        return {
+            "improved_code": improvement_response.improved_code,
+            "applied_fixes": improvement_response.applied_fixes,
+            "improvement_summary": improvement_response.improvement_summary,
+            "confidence_score": improvement_response.confidence_score,
+            "warnings": improvement_response.warnings,
+            "context_analysis": {
+                "git_context_available": git_context_retriever.is_available(),
+                "context_summary": context_summary,
+                "related_files_count": len(related_context),
+                "related_files": list(related_context.keys()) if related_context else []
+            },
+            "static_analysis": {
+                "issues_found": len(audit_response.issues),
+                "fixes_suggested": len(audit_response.fixes),
+                "analysis_tools": len(audit_response.analysis_tools)
+            },
+            "improvement_type": "context_aware",
+            "ai_provider_used": ai_provider
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Context-aware improvement failed: {str(e)}")
+
 if __name__ == "__main__":
     # Run the application - optimized for both development and Cloud Run
     environment = os.environ.get("ENVIRONMENT", "development")
