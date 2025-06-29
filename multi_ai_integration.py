@@ -7,7 +7,7 @@ import os
 import logging
 from typing import List, Optional
 
-from chatgpt_integration import ChatGPTCodeImprover, CodeImprovementRequest, CodeImprovementResponse
+from chatgpt_integration import MultiLLMCodeImprover, CodeImprovementRequest, CodeImprovementResponse
 
 
 class MultiAIManager:

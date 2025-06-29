@@ -1,11 +1,12 @@
 """
-ChatGPT Integration for CodeGuard API.
-Enables AI-powered code improvement suggestions and automatic fix implementation.
+Multi-LLM Integration for CodeGuard API.
+Enables AI-powered code improvement suggestions with OpenAI, DeepSeek R1, and other providers.
 """
 
 import os
 import json
 import re
+import requests
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from openai import OpenAI
@@ -13,13 +14,15 @@ from models import Issue, Fix, CodeFile
 
 @dataclass
 class CodeImprovementRequest:
-    """Request for ChatGPT to improve code based on CodeGuard analysis."""
+    """Request for AI to improve code based on CodeGuard analysis."""
     original_code: str
     filename: str
     issues: List[Issue]
     fixes: List[Fix]
     improvement_level: str = "moderate"  # conservative, moderate, aggressive
     preserve_functionality: bool = True
+    ai_provider: str = "openai"  # openai, deepseek, gemini, claude
+    ai_api_key: Optional[str] = None
 
 @dataclass
 class CodeImprovementResponse:
@@ -30,22 +33,66 @@ class CodeImprovementResponse:
     confidence_score: float
     warnings: List[str]
 
-class ChatGPTCodeImprover:
-    """ChatGPT integration for implementing CodeGuard suggestions."""
+class MultiLLMCodeImprover:
+    """Multi-LLM integration for implementing CodeGuard suggestions with OpenAI, DeepSeek R1, and others."""
     
     def __init__(self):
         self.openai_client = None
-        self._initialize_openai()
+        self.deepseek_api_key = None
+        self._initialize_providers()
     
-    def _initialize_openai(self):
-        """Initialize OpenAI client with API key."""
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if api_key:
-            self.openai_client = OpenAI(api_key=api_key)
+    def _initialize_providers(self):
+        """Initialize all available LLM providers."""
+        # OpenAI
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        if openai_key:
+            self.openai_client = OpenAI(api_key=openai_key)
+        
+        # DeepSeek R1
+        self.deepseek_api_key = os.environ.get("DEEPSEEK_API_KEY")
+        
+    def _call_deepseek_r1(self, prompt: str, api_key: Optional[str] = None) -> str:
+        """Call DeepSeek R1 API for code improvement."""
+        used_api_key = api_key or self.deepseek_api_key
+        if not used_api_key:
+            raise ValueError("DeepSeek API key not available")
+        
+        # DeepSeek R1 API endpoint
+        url = "https://api.deepseek.com/v1/chat/completions"
+        
+        headers = {
+            "Authorization": f"Bearer {used_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": "deepseek-r1",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "max_tokens": 4000,
+            "temperature": 0.1,
+            "stream": False
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=60)
+            response.raise_for_status()
+            
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+            
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"DeepSeek API request failed: {str(e)}")
+        except (KeyError, IndexError) as e:
+            raise Exception(f"DeepSeek API response format error: {str(e)}")
     
     def improve_code(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
         """
-        Use ChatGPT to implement CodeGuard suggestions and improve code.
+        Use AI provider to implement CodeGuard suggestions and improve code.
         
         Args:
             request: Code improvement request with original code and issues
@@ -53,51 +100,102 @@ class ChatGPTCodeImprover:
         Returns:
             Response with improved code and explanations
         """
-        if not self.openai_client:
-            return self._fallback_improvement(request)
+        ai_provider = request.ai_provider.lower() if request.ai_provider else "openai"
         
         try:
-            # Build comprehensive prompt for ChatGPT
-            prompt = self._build_improvement_prompt(request)
-            
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-            # do not change this unless explicitly requested by the user
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert Python developer specializing in ML/RL code improvements. "
-                        "Apply the suggested fixes while maintaining code functionality and readability. "
-                        "Return your response in JSON format with 'improved_code', 'applied_fixes', "
-                        "'improvement_summary', 'confidence_score', and 'warnings' fields."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.1,  # Low temperature for consistent code improvements
-                max_tokens=4000
-            )
-            
-            content = response.choices[0].message.content
-            if content:
-                result = json.loads(content)
+            # Route to appropriate AI provider
+            if ai_provider == "deepseek":
+                return self._improve_with_deepseek(request)
+            elif ai_provider == "openai":
+                return self._improve_with_openai(request)
             else:
-                result = {}
-            
-            return CodeImprovementResponse(
-                improved_code=result.get("improved_code", request.original_code),
-                applied_fixes=result.get("applied_fixes", []),
-                improvement_summary=result.get("improvement_summary", "No improvements applied"),
-                confidence_score=float(result.get("confidence_score", 0.5)),
-                warnings=result.get("warnings", [])
-            )
-            
+                # Default to OpenAI if provider not recognized
+                return self._improve_with_openai(request)
+                
         except Exception as e:
             return self._handle_improvement_error(request, str(e))
+    
+    def _improve_with_openai(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
+        """Use OpenAI GPT-4o for code improvement."""
+        if not self.openai_client and not request.ai_api_key:
+            return self._fallback_improvement(request)
+        
+        # Use provided API key if available
+        client = self.openai_client
+        if request.ai_api_key:
+            client = OpenAI(api_key=request.ai_api_key)
+        
+        prompt = self._build_improvement_prompt(request)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert Python developer specializing in ML/RL code improvements. "
+                    "Apply the suggested fixes while maintaining code functionality and readability. "
+                    "Return your response in JSON format with 'improved_code', 'applied_fixes', "
+                    "'improvement_summary', 'confidence_score', and 'warnings' fields."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.1,
+            max_tokens=4000
+        )
+        
+        content = response.choices[0].message.content
+        if content:
+            result = json.loads(content)
+        else:
+            result = {}
+        
+        return CodeImprovementResponse(
+            improved_code=result.get("improved_code", request.original_code),
+            applied_fixes=result.get("applied_fixes", []),
+            improvement_summary=result.get("improvement_summary", "No improvements applied"),
+            confidence_score=float(result.get("confidence_score", 0.5)),
+            warnings=result.get("warnings", [])
+        )
+    
+    def _improve_with_deepseek(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
+        """Use DeepSeek R1 for code improvement."""
+        prompt = self._build_improvement_prompt(request)
+        
+        # Add JSON format instruction to prompt for DeepSeek
+        prompt += "\n\nIMPORTANT: Return your response as valid JSON with these exact keys: 'improved_code', 'applied_fixes', 'improvement_summary', 'confidence_score', 'warnings'."
+        
+        response_text = self._call_deepseek_r1(prompt, request.ai_api_key)
+        
+        # Parse DeepSeek response
+        try:
+            # Extract JSON from response if it contains additional text
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                # Fallback: try to parse entire response as JSON
+                result = json.loads(response_text)
+        except json.JSONDecodeError:
+            # If JSON parsing fails, create structured response
+            result = {
+                "improved_code": request.original_code,
+                "applied_fixes": [],
+                "improvement_summary": "DeepSeek R1 provided text response but JSON parsing failed",
+                "confidence_score": 0.3,
+                "warnings": ["Response format parsing issue"]
+            }
+        
+        return CodeImprovementResponse(
+            improved_code=result.get("improved_code", request.original_code),
+            applied_fixes=result.get("applied_fixes", []),
+            improvement_summary=result.get("improvement_summary", "DeepSeek R1 code improvement completed"),
+            confidence_score=float(result.get("confidence_score", 0.7)),
+            warnings=result.get("warnings", [])
+        )
     
     def _build_improvement_prompt(self, request: CodeImprovementRequest) -> str:
         """Build comprehensive prompt for ChatGPT code improvement."""
@@ -209,7 +307,7 @@ class BatchCodeImprover:
     """Handles batch improvement of multiple files."""
     
     def __init__(self):
-        self.improver = ChatGPTCodeImprover()
+        self.improver = MultiLLMCodeImprover()
     
     def improve_project(self, files: List[CodeFile], audit_results: Dict[str, Any]) -> Dict[str, CodeImprovementResponse]:
         """
@@ -252,11 +350,11 @@ class BatchCodeImprover:
 _code_improver = None
 _batch_improver = None
 
-def get_code_improver() -> ChatGPTCodeImprover:
-    """Get or create ChatGPT code improver instance."""
+def get_code_improver() -> MultiLLMCodeImprover:
+    """Get or create multi-LLM code improver instance."""
     global _code_improver
     if _code_improver is None:
-        _code_improver = ChatGPTCodeImprover()
+        _code_improver = MultiLLMCodeImprover()
     return _code_improver
 
 def get_batch_improver() -> BatchCodeImprover:
