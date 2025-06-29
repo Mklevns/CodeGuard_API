@@ -38,7 +38,14 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     
     stored_api_key = get_api_key_from_env()
     if not stored_api_key:
-        # Allow requests when no API key is configured (development mode)
+        # In production, require API key. In development, allow without key.
+        import os
+        if os.getenv("ENVIRONMENT", "development") == "production":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key required in production mode",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         return True
     
     provided_key = credentials.credentials

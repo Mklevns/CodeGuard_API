@@ -18,6 +18,7 @@ from false_positive_filter import get_false_positive_filter
 from semantic_analyzer import analyze_code_semantically, SemanticFalsePositiveFilter
 from graph_analyzer import analyze_repository_structure
 from git_analyzer import GitContextRetriever
+from analysis_cache import get_file_cache, get_project_cache
 
 
 class EnhancedAuditEngine:

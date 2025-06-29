@@ -238,7 +238,7 @@ from matplotlib.animation import FuncAnimation
 import pickle
 
 def very_long_function_name_that_exceeds_the_character_limit_significantly():
-    model = pickle.load(open('model.pkl', 'rb'))
+    model = torch.load('model.pth', map_location='cpu')
     return model
 """
     

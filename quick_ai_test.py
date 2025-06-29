@@ -21,9 +21,9 @@ def unsafe_function():
     # Missing random seed
     model = torch.nn.Linear(10, 1)
     
-    # Unsafe pickle usage
-    with open("model.pkl", "rb") as f:
-        data = pickle.load(f)
+    # Safe model loading using torch.load instead of pickle
+    with open("model.pth", "rb") as f:
+        data = torch.load(f, map_location='cpu')
     
     return model, data
 '''
