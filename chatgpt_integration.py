@@ -419,9 +419,12 @@ class MultiLLMCodeImprover:
             return self._fallback_improvement(request)
         
         # Use provided API key if available
-        client = self.openai_client
         if request.ai_api_key:
             client = OpenAI(api_key=request.ai_api_key)
+        elif self.openai_client:
+            client = self.openai_client
+        else:
+            return self._fallback_improvement(request)
         
         prompt = self._build_improvement_prompt(request)
         

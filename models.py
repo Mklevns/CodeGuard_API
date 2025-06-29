@@ -16,6 +16,8 @@ class AuditRequest(BaseModel):
     """Request model for the audit endpoint."""
     files: List[CodeFile] = Field(description="List of files to analyze", min_length=1)
     options: Optional[AuditOptions] = Field(default=None, description="Optional audit configuration")
+    ai_provider: Optional[str] = Field(default="openai", description="AI provider for improvements", examples=["openai", "deepseek", "gemini", "claude"])
+    ai_api_key: Optional[str] = Field(default=None, description="AI API key for improvements")
 
     class Config:
         json_schema_extra = {

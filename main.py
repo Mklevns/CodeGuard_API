@@ -1051,25 +1051,37 @@ async def audit_and_improve_combined(request: AuditRequest):
     This is the most comprehensive endpoint for getting both analysis and AI-powered fixes.
     """
     try:
-        # Perform initial audit
-        audit_response = analyze_code(request)
+        # Perform initial audit WITHOUT false positive filtering to get all issues
+        audit_response = await _perform_audit(request, validate_with_ai=False)
         
         # Track telemetry for the audit
         session_id = str(uuid.uuid4())
         start_time = time.time()
         
-        # Improve each file using ChatGPT
+        # Improve each file using AI
         improvements = {}
         batch_improver = get_batch_improver()
         
-        if request.files:
-            project_improvements = batch_improver.improve_project(request.files, {
-                "issues": audit_response.issues,
-                "fixes": audit_response.fixes
-            })
-            
-            for filename, improvement in project_improvements.items():
-                improvements[filename] = {
+        if request.files and request.ai_api_key:
+            # Create improvement requests for each file with AI provider info
+            for file in request.files:
+                from chatgpt_integration import CodeImprovementRequest
+                
+                improvement_request = CodeImprovementRequest(
+                    original_code=file.content,
+                    filename=file.filename,
+                    issues=audit_response.issues,
+                    fixes=audit_response.fixes,
+                    improvement_level="moderate",
+                    preserve_functionality=True,
+                    ai_provider=request.ai_provider or "openai",
+                    ai_api_key=request.ai_api_key
+                )
+                
+                code_improver = get_code_improver()
+                improvement = code_improver.improve_code(improvement_request)
+                
+                improvements[file.filename] = {
                     "improved_code": improvement.improved_code,
                     "applied_fixes": improvement.applied_fixes,
                     "improvement_summary": improvement.improvement_summary,
@@ -1098,13 +1110,15 @@ async def audit_and_improve_combined(request: AuditRequest):
         
         # Record telemetry (skip if errors occur to avoid blocking)
         try:
-            telemetry_collector.record_audit_session({
-                'session_id': session_id,
-                'file_count': len(request.files),
-                'total_issues': len(audit_response.issues),
-                'analysis_time_ms': processing_time * 1000,
-                'framework_detected': framework
-            })
+            from telemetry import AuditSession
+            session_data = AuditSession(
+                session_id=session_id,
+                file_count=len(request.files),
+                total_issues=len(audit_response.issues),
+                analysis_time_ms=int(processing_time * 1000),
+                framework_detected=framework
+            )
+            telemetry_collector.record_audit_session(session_data)
         except Exception:
             pass  # Don't let telemetry errors block the response
         
