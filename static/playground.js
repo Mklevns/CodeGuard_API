@@ -1182,6 +1182,104 @@ def evaluate_model():
         `;
         resultsEl.insertBefore(contextNotice, resultsEl.firstChild);
     }
+
+    // System Management Methods
+    async showCacheStats() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/cache/stats`);
+            const stats = await response.json();
+            
+            const message = `Analysis Cache Statistics:
+• Cache Entries: ${stats.file_cache.entries}
+• Valid Entries: ${stats.file_cache.valid_entries}
+• Storage Used: ${stats.file_cache.size_mb} MB
+• TTL Hours: ${stats.file_cache.ttl_hours}
+• Performance Impact: ${stats.performance_impact.estimated_speedup}`;
+
+            alert(message);
+        } catch (error) {
+            console.error('Error fetching cache stats:', error);
+            alert('Failed to load cache statistics');
+        }
+    }
+
+    async clearCache() {
+        if (!confirm('Are you sure you want to clear the analysis cache? This will remove all cached results.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/cache/clear`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                alert('Analysis cache cleared successfully');
+            } else {
+                throw new Error('Failed to clear cache');
+            }
+        } catch (error) {
+            console.error('Error clearing cache:', error);
+            alert('Failed to clear cache');
+        }
+    }
+
+    async showRuleConfig() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/rules/config`);
+            const config = await response.json();
+            
+            const message = `Rule Configuration:
+• Total Rules: ${config.configuration.total_rules}
+• Enabled Rules: ${config.configuration.enabled_rules}
+• Disabled Rules: ${config.configuration.disabled_rules}
+
+Rules by Severity:
+${Object.entries(config.configuration.by_severity).map(([severity, count]) => `• ${severity}: ${count}`).join('\n')}
+
+Available Rule Sets:
+${Object.entries(config.rule_sets).map(([name, rules]) => `• ${name}: ${rules.length} rules`).join('\n')}`;
+
+            alert(message);
+        } catch (error) {
+            console.error('Error fetching rule configuration:', error);
+            alert('Failed to load rule configuration');
+        }
+    }
+
+    async showSystemHealth() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/system/health/detailed`);
+            const health = await response.json();
+            
+            const status = health.status.toUpperCase();
+            const message = `System Health: ${status}
+
+Analysis Engine: ${health.analysis_engine.status}
+• Tools Available: ${health.analysis_engine.tools_available}
+• Semantic Analysis: ${health.analysis_engine.semantic_analysis}
+• Caching: ${health.analysis_engine.caching}
+
+Cache System: ${health.cache_system.status}
+• Entries: ${health.cache_system.entries}
+• Size: ${health.cache_system.size_mb} MB
+
+Rule System: ${health.rule_system.status}
+• Total Rules: ${health.rule_system.total_rules}
+• Enabled Rules: ${health.rule_system.enabled_rules}
+
+Authentication: ${health.authentication.status}
+• Mode: ${health.authentication.mode}
+
+Version: ${health.version}
+Environment: ${health.environment}`;
+
+            alert(message);
+        } catch (error) {
+            console.error('Error fetching system health:', error);
+            alert('Failed to load system health');
+        }
+    }
 }
 
 // Initialize the playground when the page loads
