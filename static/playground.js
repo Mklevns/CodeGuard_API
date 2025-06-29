@@ -122,7 +122,20 @@ def evaluate_model():
     clearCode() {
         document.getElementById('codeInput').value = '';
         document.getElementById('filename').value = 'main.py';
+        this.resetFileSelector();
         this.hideResults();
+    }
+
+    resetFileSelector() {
+        // Reset to manual filename input
+        const filenameInput = document.getElementById('filename');
+        const fileSelect = document.getElementById('repoFileSelect');
+        const fileSourceInfo = document.getElementById('fileSourceInfo');
+        
+        filenameInput.classList.remove('hidden');
+        fileSelect.classList.add('hidden');
+        fileSourceInfo.classList.add('hidden');
+        fileSelect.value = '';
     }
 
     showStatus(message) {
@@ -884,6 +897,9 @@ def evaluate_model():
                     contextSummary: result.context_summary
                 };
                 
+                // Fetch repository files for dropdown selection
+                await this.fetchRepositoryFiles();
+                
             } else {
                 statusEl.innerHTML = '<span class="text-red-600">✗ Analysis failed: ' + (result.error || result.detail || 'Unknown error') + '</span>';
                 repoInfoEl.classList.add('hidden');
@@ -916,6 +932,111 @@ def evaluate_model():
         `;
 
         repoInfoEl.classList.remove('hidden');
+    }
+
+    async fetchRepositoryFiles() {
+        if (!this.repositoryContext) return;
+
+        try {
+            const payload = { 
+                repo_url: this.repositoryContext.url,
+                max_files: 50
+            };
+            if (this.repositoryContext.token) {
+                payload.github_token = this.repositoryContext.token;
+            }
+
+            const response = await fetch(`${this.apiBaseUrl}/repo/files`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success' && result.files.length > 0) {
+                this.populateFileDropdown(result.files);
+                this.showFileSelector();
+            }
+
+        } catch (error) {
+            console.error('Error fetching repository files:', error);
+        }
+    }
+
+    populateFileDropdown(files) {
+        const selectEl = document.getElementById('repoFileSelect');
+        const filenameInput = document.getElementById('filename');
+        
+        // Clear existing options except the first one
+        selectEl.innerHTML = '<option value="">Select a file from repository...</option>';
+        
+        // Add files to dropdown
+        files.forEach(file => {
+            const option = document.createElement('option');
+            option.value = file.path;
+            option.textContent = file.directory ? 
+                `${file.directory}/${file.filename}` : 
+                file.filename;
+            selectEl.appendChild(option);
+        });
+        
+        // Store files data for later use
+        this.repositoryFiles = files;
+    }
+
+    showFileSelector() {
+        const filenameInput = document.getElementById('filename');
+        const fileSelect = document.getElementById('repoFileSelect');
+        
+        // Hide filename input and show dropdown
+        filenameInput.classList.add('hidden');
+        fileSelect.classList.remove('hidden');
+    }
+
+    async loadSelectedRepoFile() {
+        const selectEl = document.getElementById('repoFileSelect');
+        const selectedPath = selectEl.value;
+        
+        if (!selectedPath || !this.repositoryContext) return;
+
+        const statusEl = document.getElementById('repoStatus');
+        statusEl.innerHTML = '<span class="text-blue-600">Loading file...</span>';
+
+        try {
+            const payload = {
+                repo_url: this.repositoryContext.url,
+                file_path: selectedPath
+            };
+            if (this.repositoryContext.token) {
+                payload.github_token = this.repositoryContext.token;
+            }
+
+            const response = await fetch(`${this.apiBaseUrl}/repo/file-content`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                // Load file content into editor
+                document.getElementById('codeInput').value = result.file.content;
+                document.getElementById('filename').value = result.file.filename;
+                
+                // Show file source info
+                document.getElementById('fileSourceInfo').classList.remove('hidden');
+                
+                statusEl.innerHTML = '<span class="text-green-600">✓ File loaded successfully</span>';
+            } else {
+                statusEl.innerHTML = '<span class="text-red-600">✗ Failed to load file</span>';
+            }
+
+        } catch (error) {
+            console.error('Error loading file:', error);
+            statusEl.innerHTML = '<span class="text-red-600">✗ Error loading file</span>';
+        }
     }
 
     showContextEnhancementNotice(result) {

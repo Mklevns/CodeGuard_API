@@ -388,6 +388,13 @@ Preferred communication style: Simple, everyday language.
 - Enhanced AI improvement buttons automatically use repository context when available for better suggestions
 - Context enhancement notifications display when AI receives repository-specific improvements
 - Integrated with existing audit, improve, and audit-and-improve workflows for seamless context-aware code analysis
+- **June 29, 2025**: GitHub File Selection Dropdown implemented for direct repository file analysis
+- Added `/repo/files` and `/repo/file-content` API endpoints to fetch Python files from GitHub repositories
+- Enhanced playground interface with automatic file selection dropdown after repository analysis
+- Users can now select individual Python files from their GitHub repo instead of manually copying code
+- File dropdown shows organized file structure with directory paths for easy navigation
+- Selected files load directly into code editor with source attribution and context preservation
+- Seamless integration with existing audit and improvement workflows using repository context
 
 ## Deployment Status
 
