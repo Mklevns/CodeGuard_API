@@ -1,0 +1,289 @@
+Of course. Here are detailed instructions for the best ways to implement and integrate each of the expanded GitHub repository context analysis features into the `CodeGuard` codebase.
+
+### 1\. Dependency and Vulnerability Analysis
+
+This feature will analyze `pyproject.toml` and other dependency files to find vulnerabilities and audit licenses.
+
+  * **Key Libraries to Use**: `pip-audit`, `pip-licenses`
+  * **File to Modify**: `enhanced_audit.py`, `models.py`
+  * **New Files to Create**: None
+
+**Implementation Steps**:
+
+1.  **Update `pyproject.toml`**: Add `pip-audit` and `pip-licenses` to the project dependencies.
+
+2.  **Modify `enhanced_audit.py`**:
+
+      * Create a new analysis function `_run_dependency_audit`.
+      * In this function, use `subprocess` to run `pip-audit --format=json` and `pip-licenses --format=json`.
+      * Parse the JSON output from these commands. For each vulnerability or license issue, create a new `Issue` object.
+      * Add `_run_dependency_audit` to the `self.tools` dictionary in the `EnhancedAuditEngine` constructor.
+
+    <!-- end list -->
+
+    ```python
+    # enhanced_audit.py
+
+    def _run_dependency_audit(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
+        """Run dependency and license audit."""
+        issues = []
+        fixes = []
+
+        if original_filename not in ["pyproject.toml", "requirements.txt"]:
+            return issues, fixes
+
+        # Vulnerability scanning with pip-audit
+        try:
+            result = subprocess.run(
+                ["pip-audit", "--format=json", "-r", file_path],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.stdout:
+                vulnerabilities = json.loads(result.stdout)
+                for vuln in vulnerabilities.get("vulnerabilities", []):
+                    issues.append(Issue(
+                        filename=original_filename,
+                        line=1,
+                        type="security",
+                        description=f"Vulnerability found in {vuln['name']} ({vuln['id']}): {vuln['summary']}",
+                        source="pip-audit",
+                        severity="error"
+                    ))
+        except Exception as e:
+            # Handle errors, e.g., if pip-audit is not installed
+            pass
+
+        # License auditing with pip-licenses
+        try:
+            result = subprocess.run(
+                ["pip-licenses", "--format=json"],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.stdout:
+                licenses = json.loads(result.stdout)
+                for lib in licenses:
+                    if lib['License'] == 'UNKNOWN':
+                        issues.append(Issue(
+                            filename=original_filename,
+                            line=1,
+                            type="license",
+                            description=f"Unknown license for {lib['Name']}",
+                            source="pip-licenses",
+                            severity="warning"
+                        ))
+        except Exception as e:
+            # Handle errors
+            pass
+
+        return issues, fixes
+    ```
+
+3.  **Update `main.py`**: The `/audit` endpoint will automatically pick up the new analysis tool.
+
+-----
+
+### 2\. Code Quality and Technical Debt Analysis
+
+This feature will analyze code complexity and other metrics to identify technical debt.
+
+  * **Key Libraries to Use**: `radon`
+  * **File to Modify**: `enhanced_audit.py`
+  * **New Files to Create**: None
+
+**Implementation Steps**:
+
+1.  **Update `pyproject.toml`**: Add `radon` to the project dependencies.
+
+2.  **Modify `enhanced_audit.py`**:
+
+      * Create a new analysis function `_run_complexity_analysis`.
+      * Use `radon.cli.harvest` to get complexity metrics for each file.
+      * If the cyclomatic complexity of a function is above a certain threshold (e.g., 10), create a new `Issue`.
+      * Add `_run_complexity_analysis` to the `self.tools` dictionary.
+
+    <!-- end list -->
+
+    ```python
+    # enhanced_audit.py
+    from radon.cli import harvest
+
+    def _run_complexity_analysis(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
+        """Analyze code complexity with radon."""
+        issues = []
+        fixes = []
+
+        try:
+            results = harvest([file_path], "cc", no_assert=True)
+            for file, data in results.items():
+                if isinstance(data, list):
+                    for item in data:
+                        if item.complexity > 10:  # Threshold for high complexity
+                            issues.append(Issue(
+                                filename=original_filename,
+                                line=item.lineno,
+                                type="complexity",
+                                description=f"{item.name} has a high cyclomatic complexity of {item.complexity}",
+                                source="radon",
+                                severity="warning"
+                            ))
+        except Exception as e:
+            # Handle errors
+            pass
+
+        return issues, fixes
+    ```
+
+3.  **Create Heatmaps Endpoint**: In `main.py`, create a new endpoint `/heatmap` that analyzes the repository and returns a JSON object with complexity and issue data for each file. This data can then be used by a frontend to visualize the heatmap.
+
+-----
+
+### 3\. Cross-File Analysis and Inferred Relationships
+
+This feature will analyze how files and functions relate to each other to find unused code.
+
+  * **Key Libraries to Use**: `ast`
+  * **New Files to Create**: `graph_analyzer.py`
+
+**Implementation Steps**:
+
+1.  **Create `graph_analyzer.py`**:
+
+      * This module will contain a class, e.g., `RepoAnalyzer`, that takes a list of `CodeFile` objects.
+      * It will parse each file into an AST and build a graph of all function and class definitions, and all calls between them.
+      * It will have a method `find_unused_code()` that identifies nodes in the graph with no incoming edges.
+
+    <!-- end list -->
+
+    ```python
+    # graph_analyzer.py
+    import ast
+
+    class RepoAnalyzer:
+        def __init__(self, files):
+            self.files = files
+            self.nodes = {}  # {name: {'defined_in': file, 'called_by': []}}
+            self._build_graph()
+
+        def _build_graph(self):
+            # ... logic to parse ASTs and build the call graph ...
+            pass
+
+        def find_unused_code(self):
+            unused = []
+            for name, data in self.nodes.items():
+                if not data['called_by']:
+                    unused.append({'name': name, 'file': data['defined_in']})
+            return unused
+    ```
+
+2.  **Modify `enhanced_audit.py`**:
+
+      * Create a new analysis function `_run_cross_file_analysis`.
+      * This function will be called once per audit request, not per file.
+      * It will instantiate `RepoAnalyzer`, call `find_unused_code()`, and create `Issue` objects for any unused code.
+      * This will require a slight refactoring of the main `analyze_code` loop to accommodate a repository-level analysis tool.
+
+-----
+
+### 4\. Historical Analysis and Trend Identification
+
+This feature will analyze the Git history of the repository to identify bug-prone files and code churn.
+
+  * **Key Libraries to Use**: `GitPython`
+  * **File to Modify**: `telemetry.py`
+  * **New Files to Create**: `git_analyzer.py`
+
+**Implementation Steps**:
+
+1.  **Update `pyproject.toml`**: Add `GitPython` to the dependencies.
+
+2.  **Create `git_analyzer.py`**:
+
+      * This module will contain a class that takes a path to a Git repository.
+      * It will have methods to:
+          * Get the commit history for a file.
+          * Identify commits that are bug fixes (e.g., by looking for keywords like "fix" or "bug" in the commit message).
+          * Calculate code churn (how often a file is changed).
+
+3.  **Integrate with Telemetry**:
+
+      * The results of the Git analysis can be stored in the telemetry database. This will allow you to track trends over time and identify files that are consistently problematic.
+      * This would likely be an offline or asynchronous process, rather than part of the real-time audit, due to the potential performance overhead.
+
+-----
+
+### 5\. Enhanced AI-Powered Assistance
+
+This will enhance the existing AI features with more repository context.
+
+  * **Key Libraries to Use**: `openai` (already in use)
+  * **File to Modify**: `chatgpt_integration.py`
+  * **New Files to Create**: None
+
+**Implementation Steps**:
+
+1.  **Modify `_build_improvement_prompt`**:
+
+      * In addition to the code and issues, add more context to the prompt, such as:
+          * Related files (e.g., files that are imported or that import the current file).
+          * The call graph for the current function.
+          * The project's dependency list.
+
+2.  **Create Automated Documentation Endpoint**:
+
+      * In `main.py`, create a new endpoint `/generate/docs`.
+      * This endpoint will take a filename and a function or class name.
+      * It will then call the AI with the code and repository context to generate documentation.
+
+3.  **Create Intelligent Refactoring Endpoint**:
+
+      * Create a new endpoint `/refactor` that takes a file and a selection of code.
+      * It will use the AI, along with the repository context, to suggest refactorings.
+
+-----
+
+### 6\. Integration with CI/CD Pipelines
+
+This will allow `CodeGuard` to be used in a continuous integration workflow.
+
+  * **Key Libraries to Use**: None (will use command-line tools)
+  * **New Files to Create**: A sample `ci.yml` for GitHub Actions.
+
+**Implementation Steps**:
+
+1.  **Create a Sample GitHub Actions Workflow**:
+
+      * This workflow will run on every pull request.
+      * It will check out the code, install dependencies, and then run `CodeGuard` using a `curl` command or a dedicated CLI tool.
+      * The `curl` command will call the `/audit` endpoint of your deployed `CodeGuard` API.
+      * The workflow will fail if any "error" severity issues are found.
+
+    <!-- end list -->
+
+    ```yaml
+    # .github/workflows/ci.yml
+    name: CodeGuard Analysis
+
+    on: [pull_request]
+
+    jobs:
+      codeguard:
+        runs-on: ubuntu-latest
+        steps:
+        - uses: actions/checkout@v2
+        - name: Run CodeGuard
+          run: |
+            # ... script to gather files and call the CodeGuard API ...
+            # For example:
+            # curl -X POST -H "Content-Type: application/json" \
+            # -d '{"files": [{"filename": "...", "content": "..."}]}' \
+            # https://your-codeguard-api.com/audit
+    ```
+
+2.  **Develop a CLI Tool**: For easier integration, you could create a simple Python CLI tool that wraps the API calls. This would be more user-friendly than using `curl` directly in the CI script.
+
+By implementing these features, you can significantly enhance the capabilities of `CodeGuard`, transforming it from a simple linter into a comprehensive code quality and security platform for ML/RL projects.
