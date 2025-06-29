@@ -946,6 +946,24 @@ Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not crea
         improved_code = request.original_code
         applied_fixes = []
         
+        # Use reliable code fixer for automatic improvements
+        from reliable_code_fixer import create_reliable_fixer
+        
+        try:
+            reliable_fixer = create_reliable_fixer()
+            result = reliable_fixer.fix_code(request.original_code, request.issues)
+            
+            return CodeImprovementResponse(
+                improved_code=result.get("improved_code", request.original_code),
+                applied_fixes=result.get("applied_fixes", []),
+                improvement_summary=result.get("improvement_summary", "Applied automated fallback fixes"),
+                confidence_score=result.get("confidence_score", 0.7),
+                warnings=result.get("warnings", []) + ["AI provider unavailable - using automated fixes only"]
+            )
+        except Exception as e:
+            # If automated fixer fails, apply manual fixes
+            pass
+        
         # Apply auto-fixable improvements from CodeGuard suggestions
         for fix in request.fixes:
             if fix.auto_fixable:

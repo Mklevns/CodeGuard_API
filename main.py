@@ -92,6 +92,24 @@ async def audit_code_no_filter(request: AuditRequest, current_user: dict = Depen
     """
     return await _perform_audit(request, validate_with_ai=False)
 
+def _record_audit_telemetry(session_id: str, request: AuditRequest, response: AuditResponse, analysis_time: float):
+    """Record telemetry data for audit session."""
+    try:
+        request_analysis = metrics_analyzer.analyze_request(request)
+        response_analysis = metrics_analyzer.analyze_response(response)
+        
+        session = metrics_analyzer.create_session(
+            session_id, request_analysis, response_analysis, analysis_time
+        )
+        telemetry_collector.record_audit_session(session)
+        telemetry_collector.record_error_patterns(session_id, response.issues)
+        
+        if request_analysis['primary_framework']:
+            telemetry_collector.record_framework_usage(request_analysis['primary_framework'])
+    except Exception:
+        # Don't let telemetry errors affect audit results
+        pass
+
 async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
     """
     Analyzes submitted Python code files and returns a report of issues and suggestions.
@@ -110,17 +128,12 @@ async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
     start_time = time.time()
     
     try:
-        # Analyze request for telemetry
-        request_analysis = metrics_analyzer.analyze_request(request)
-        
-        # Apply timeout logic for AI validation
-        analysis_timeout = 40  # Total analysis timeout in seconds
-        
         # Perform code analysis with configurable AI validation and timeout
         from enhanced_audit import EnhancedAuditEngine
         import asyncio
         
         engine = EnhancedAuditEngine(use_false_positive_filter=validate_with_ai)
+        analysis_timeout = 40  # Total analysis timeout in seconds
         
         try:
             # Run analysis with timeout
@@ -138,29 +151,14 @@ async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
             else:
                 raise HTTPException(status_code=504, detail="Analysis timed out")
         
-        # Calculate analysis time
-        analysis_time = (time.time() - start_time) * 1000  # Convert to ms
-        
-        # Analyze response for telemetry
-        response_analysis = metrics_analyzer.analyze_response(response)
-        
-        # Create and record telemetry session
-        session = metrics_analyzer.create_session(
-            session_id, request_analysis, response_analysis, analysis_time
-        )
-        telemetry_collector.record_audit_session(session)
-        telemetry_collector.record_error_patterns(session_id, response.issues)
-        
-        # Record framework usage if detected
-        if request_analysis['primary_framework']:
-            telemetry_collector.record_framework_usage(request_analysis['primary_framework'])
+        # Record telemetry
+        analysis_time = (time.time() - start_time) * 1000
+        _record_audit_telemetry(session_id, request, response, analysis_time)
         
         return response
         
     except Exception as e:
-        # Record failed session for monitoring
         analysis_time = (time.time() - start_time) * 1000
-        # Log error but don't expose internal details
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/.well-known/openapi.yaml")

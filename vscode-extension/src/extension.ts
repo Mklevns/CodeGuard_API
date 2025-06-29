@@ -10,7 +10,7 @@ let configManager: ConfigManager;
 let projectSetupManager: ProjectSetupManager;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('CodeGuard extension is now active!');
+    
     
     // Initialize components
     configManager = new ConfigManager(context);
@@ -146,7 +146,7 @@ async function runAuditForDocument(document: vscode.TextDocument) {
         
     } catch (error) {
         vscode.window.showErrorMessage(`CodeGuard analysis failed: ${error}`);
-        console.error('CodeGuard error:', error);
+        
     }
 }
 
@@ -295,7 +295,7 @@ async function improveCurrentFileWithChatGPT() {
 
     } catch (error) {
         vscode.window.showErrorMessage(`ChatGPT improvement failed: ${error}`);
-        console.error('ChatGPT improvement error:', error);
+        
     }
 }
 

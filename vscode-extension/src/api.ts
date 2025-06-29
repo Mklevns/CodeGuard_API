@@ -66,10 +66,7 @@ export class CodeGuardAPI {
         return response.data;
     }
 
-    // Alias method for backwards compatibility with extension
-    async auditCode(files: CodeFile[], options?: AuditOptions): Promise<AuditResponse> {
-        return this.audit(files, options);
-    }
+    
 
     async auditWithoutFilter(files: CodeFile[], options?: AuditOptions): Promise<AuditResponse> {
         const requestData = {
@@ -156,10 +153,7 @@ export class CodeGuardAPI {
         return response.data;
     }
 
-    // Alias method for backwards compatibility with extension
-    async generateReport(files: CodeFile[], format: string = 'markdown', includeAiSuggestions: boolean = true, applyFiltering: boolean = true): Promise<any> {
-        return this.generateImprovementReport(files, format, includeAiSuggestions, applyFiltering);
-    }
+    
 
     // Project template methods for VS Code extension
     async getProjectTemplates(): Promise<any[]> {

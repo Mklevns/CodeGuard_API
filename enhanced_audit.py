@@ -271,9 +271,17 @@ class EnhancedAuditEngine:
                             )
                             fixes.append(fix)
                             
-                except json.JSONDecodeError:
-                    # Fallback to text parsing if JSON fails
-                    pass
+                except json.JSONDecodeError as e:
+                    # Log JSON parsing error and skip pylint results
+                    issues.append(Issue(
+                        filename=original_filename,
+                        line=1,
+                        type="error",
+                        description=f"pylint JSON parsing failed: {str(e)}",
+                        source="pylint",
+                        severity="warning"
+                    ))
+                    return issues, fixes
                     
         except subprocess.TimeoutExpired:
             issues.append(Issue(

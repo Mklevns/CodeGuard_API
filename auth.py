@@ -29,8 +29,30 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     Raises:
         HTTPException: If authentication fails
     """
-    # Temporarily disable authentication to fix ChatGPT actions integration
-    # This allows the service to work with external integrations
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    stored_api_key = get_api_key_from_env()
+    if not stored_api_key:
+        # Allow requests when no API key is configured (development mode)
+        return True
+    
+    provided_key = credentials.credentials
+    expected_hash = hash_api_key(stored_api_key)
+    provided_hash = hash_api_key(provided_key)
+    
+    # Use constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(expected_hash, provided_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     return True
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:

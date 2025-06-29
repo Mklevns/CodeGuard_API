@@ -102,43 +102,45 @@ class CustomRuleEngine:
         
         return issues, fixes
     
-    def _check_pattern_rule(self, rule: Dict[str, Any], content: str) -> bool:
-        """Check if a pattern-based rule matches the entire file content."""
-        if "pattern" not in rule:
-            return False
-        
-        pattern = rule["pattern"]
-        
-        # Check if pattern exists in content
-        if pattern not in content:
-            return False
-        
-        # Check exclusions
-        if "not_contains" in rule:
-            for exclude in rule["not_contains"]:
-                if exclude in content:
-                    return False
-        
-        return True
-    
-    def _check_line_rule(self, rule: Dict[str, Any], line: str, full_content: str) -> bool:
-        """Check if a line-based rule matches a specific line."""
-        matched = False
-        
+    def _matches_pattern(self, rule: Dict[str, Any], text: str) -> bool:
+        """Check if text matches rule patterns."""
         # Check contains rule
-        if "contains" in rule and rule["contains"] in line:
-            matched = True
+        if "contains" in rule and rule["contains"] in text:
+            return True
+        
+        # Check pattern rule
+        if "pattern" in rule and rule["pattern"] in text:
+            return True
         
         # Check regex rule
         if "regex" in rule:
             try:
-                if re.search(rule["regex"], line):
-                    matched = True
+                if re.search(rule["regex"], text):
+                    return True
             except re.error:
                 # Invalid regex, skip this rule
                 pass
         
-        return matched
+        return False
+    
+    def _check_exclusions(self, rule: Dict[str, Any], content: str) -> bool:
+        """Check if content matches exclusion patterns."""
+        if "not_contains" in rule:
+            for exclude in rule["not_contains"]:
+                if exclude in content:
+                    return True
+        return False
+    
+    def _check_pattern_rule(self, rule: Dict[str, Any], content: str) -> bool:
+        """Check if a pattern-based rule matches the entire file content."""
+        if not self._matches_pattern(rule, content):
+            return False
+        
+        return not self._check_exclusions(rule, content)
+    
+    def _check_line_rule(self, rule: Dict[str, Any], line: str, full_content: str) -> bool:
+        """Check if a line-based rule matches a specific line."""
+        return self._matches_pattern(rule, line)
     
     def _map_severity_to_type(self, severity: str) -> str:
         """Map severity level to issue type."""
