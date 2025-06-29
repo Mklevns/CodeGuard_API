@@ -651,7 +651,14 @@ Always provide complete, working code in the improved_code field."""
     
     def _improve_with_deepseek(self, request: CodeImprovementRequest, custom_prompt_response=None) -> CodeImprovementResponse:
         """Use DeepSeek with Function Calling for enhanced code improvement."""
-        prompt = self._build_deepseek_function_prompt(request)
+        
+        # Use custom prompt if available, otherwise use default
+        if custom_prompt_response:
+            prompt = custom_prompt_response.system_prompt + "\n\n" + self._build_deepseek_function_prompt(request)
+            confidence_boost = custom_prompt_response.confidence_boost
+        else:
+            prompt = self._build_deepseek_function_prompt(request)
+            confidence_boost = 0.0
         
         try:
             response_text = self._call_deepseek_r1(prompt, request.ai_api_key)
@@ -669,11 +676,15 @@ Always provide complete, working code in the improved_code field."""
                     "warnings": ["Enhanced analysis completed via function calling"]
                 }
             
+            # Apply confidence boost from custom prompt
+            base_confidence = float(result.get("confidence_score", 0.8))
+            final_confidence = min(base_confidence + confidence_boost, 1.0)
+            
             return CodeImprovementResponse(
                 improved_code=result.get("improved_code", request.original_code),
                 applied_fixes=result.get("applied_fixes", []),
                 improvement_summary=result.get("improvement_summary", "DeepSeek Function Calling analysis completed"),
-                confidence_score=float(result.get("confidence_score", 0.8)),
+                confidence_score=final_confidence,
                 warnings=result.get("warnings", [])
             )
             

@@ -14,6 +14,7 @@ from historical_timeline import get_timeline_generator
 from gpt_connector import get_gpt_connector, get_issue_explainer
 from project_templates import MLProjectGenerator
 from chatgpt_integration import get_code_improver, get_batch_improver, CodeImprovementRequest
+from llm_prompt_generator import get_llm_prompt_generator
 from multi_ai_integration import get_multi_ai_manager
 from ml_performance_heatmap import heatmap_api, HeatmapConfig
 import uuid
@@ -627,6 +628,55 @@ async def apply_bulk_fixes(request: dict):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bulk fix failed: {str(e)}")
+
+@app.post("/improve/generate-custom-prompt")
+async def generate_custom_prompt(request: dict) -> dict:
+    """Generate a custom AI prompt based on audit results using LLM analysis."""
+    try:
+        files = request.get("files", [])
+        issues = request.get("issues", [])
+        fixes = request.get("fixes", [])
+        ai_provider = request.get("ai_provider", "openai")
+        
+        if not files:
+            raise HTTPException(status_code=400, detail="Files are required for prompt generation")
+        
+        # Convert to proper objects
+        from models import CodeFile, Issue, Fix
+        
+        code_files = [CodeFile(filename=f.get("filename", ""), content=f.get("content", "")) for f in files]
+        issue_objects = [Issue(
+            filename=i.get("filename", ""),
+            line=i.get("line", 1),
+            type=i.get("type", "unknown"),
+            description=i.get("description", ""),
+            source=i.get("source", "unknown"),
+            severity=i.get("severity", "warning")
+        ) for i in issues]
+        
+        # Generate custom prompt using LLM
+        prompt_generator = get_llm_prompt_generator()
+        result = prompt_generator.generate_custom_prompt(
+            issues=issue_objects,
+            fixes=[],
+            code_files=code_files,
+            ai_provider=ai_provider
+        )
+        
+        return {
+            "status": "success",
+            "custom_prompt": result.system_prompt,
+            "confidence_boost": result.confidence_boost,
+            "focus_areas": result.focus_areas,
+            "prompt_strategy": result.prompt_strategy,
+            "estimated_effectiveness": result.estimated_effectiveness,
+            "total_issues_analyzed": len(issue_objects),
+            "frameworks_detected": len([f for f in code_files if any(pattern in f.content for pattern in ["torch", "tensorflow", "gym", "sklearn"])]),
+            "ai_provider": ai_provider
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prompt generation failed: {str(e)}")
 
 @app.post("/improve/fim-completion")
 async def fim_code_completion(request: dict) -> dict:
