@@ -128,16 +128,62 @@ class MultiLLMCodeImprover:
         self.deepseek_api_key = os.environ.get("DEEPSEEK_API_KEY")
         
     def _call_deepseek_r1(self, prompt: str, api_key: Optional[str] = None) -> str:
-        """Call DeepSeek R1 API for code improvement."""
+        """Call DeepSeek API for code improvement with JSON prefix completion."""
+        from openai import OpenAI
+        
         used_api_key = api_key or self.deepseek_api_key
         if not used_api_key:
             raise ValueError("DeepSeek API key not available")
         
-        # DeepSeek R1 API endpoint
+        # Use OpenAI client with DeepSeek beta endpoint for prefix completion
+        client = OpenAI(
+            api_key=used_api_key,
+            base_url="https://api.deepseek.com/beta"
+        )
+        
+        # Enhanced prompt for JSON code improvement
+        system_prompt = """You are an expert Python developer specializing in ML/RL code improvements. 
+Analyze the provided code and return a JSON response with improved code and detailed explanations.
+Always provide complete, working code in the improved_code field."""
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": "{\n", "prefix": True}
+        ]
+        
+        try:
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=messages,
+                stop=["}"],
+                max_tokens=4000,
+                temperature=0.1
+            )
+            
+            # Reconstruct complete JSON from prefix + response
+            response_content = response.choices[0].message.content or ""
+            json_content = "{\n" + response_content + "}"
+            
+            # Validate and return JSON
+            try:
+                json.loads(json_content)  # Validate JSON
+                return json_content
+            except json.JSONDecodeError:
+                # Fallback to function calling if prefix completion fails
+                return self._call_deepseek_function_calling(prompt, used_api_key)
+                
+        except Exception as e:
+            # Fallback to function calling approach
+            return self._call_deepseek_function_calling(prompt, used_api_key)
+    
+    def _call_deepseek_function_calling(self, prompt: str, api_key: str) -> str:
+        """Fallback to DeepSeek Function Calling approach."""
+        # DeepSeek Function Calling API endpoint
         url = "https://api.deepseek.com/v1/chat/completions"
         
         headers = {
-            "Authorization": f"Bearer {used_api_key}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         
@@ -197,16 +243,28 @@ class MultiLLMCodeImprover:
             
             # Check if DeepSeek wants to call functions
             if message.get("tool_calls"):
-                return self._handle_function_calls(message, used_api_key, data["messages"])
+                return self._handle_function_calls(message, api_key, data["messages"])
             
-            # Regular content response
+            # Regular content response - format as JSON for consistency
             content = message.get("content", "")
-            
-            # Ensure we return a string, not None
             if not content:
                 raise Exception("DeepSeek API returned empty response")
             
-            return content
+            # Try to format as structured JSON response
+            try:
+                # If content is already JSON, return it
+                json.loads(content)
+                return content
+            except json.JSONDecodeError:
+                # If not JSON, wrap in standard format
+                structured_response = {
+                    "improved_code": content,
+                    "applied_fixes": [],
+                    "improvement_summary": "DeepSeek Function Calling analysis completed",
+                    "confidence_score": 0.8,
+                    "warnings": []
+                }
+                return json.dumps(structured_response)
             
         except requests.exceptions.Timeout:
             raise Exception("DeepSeek function calling is processing - this may take longer than expected")
