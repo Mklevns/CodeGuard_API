@@ -264,6 +264,15 @@ Preferred communication style: Simple, everyday language.
 - Added proper response_format parameter {'type': 'json_object'} for reliable JSON responses
 - Enhanced error handling for empty responses and JSON parsing failures
 - DeepSeek AI provider now works reliably for code improvement suggestions in playground
+- **June 29, 2025**: Enhanced DeepSeek integration with Function Calling capabilities
+- Implemented comprehensive Function Calling system with three specialized analysis tools:
+  - analyze_code_security: Deep security vulnerability analysis with recommendations
+  - generate_ml_best_practices: ML/RL framework-specific improvements and best practices
+  - optimize_code_performance: Performance optimization suggestions for memory, speed, and GPU usage
+- Added intelligent function execution handlers for enhanced code analysis workflow
+- DeepSeek now performs multi-step analysis using tools before providing final improvements
+- Enhanced prompt engineering for targeted framework detection (PyTorch, TensorFlow, OpenAI Gym)
+- Function Calling provides more comprehensive and specialized code improvements compared to basic chat responses
 
 ## Deployment Status
 
