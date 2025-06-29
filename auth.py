@@ -31,10 +31,20 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
     """
     import os
     
-    # In development mode, allow access without credentials for playground
-    if os.getenv("ENVIRONMENT", "development") == "development":
-        if not credentials:
-            return True
+    # Get stored API key or use development default
+    stored_api_key = get_api_key_from_env()
+    environment = os.getenv("ENVIRONMENT", "development")
+    
+    # Use development key if no production key is set
+    if not stored_api_key and environment == "development":
+        stored_api_key = "codeguard-dev-key-2025"  # Consistent dev key
+    
+    if not stored_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key configuration missing",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     if not credentials:
         raise HTTPException(
@@ -42,17 +52,6 @@ def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security
             detail="API key required",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    stored_api_key = get_api_key_from_env()
-    if not stored_api_key:
-        # In production, require API key. In development, allow without key.
-        if os.getenv("ENVIRONMENT", "development") == "production":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="API key required in production mode",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        return True
     
     provided_key = credentials.credentials
     expected_hash = hash_api_key(stored_api_key)
@@ -78,23 +77,20 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
     Returns:
         User information dictionary
     """
-    from fastapi import HTTPException
     import os
     
-    try:
-        verify_api_key(credentials)
-        stored_api_key = get_api_key_from_env()
-        return {
-            "authenticated": True,
-            "mode": "development" if not stored_api_key else "production",
-            "api_key_hash": hash_api_key(credentials.credentials)[:8] if credentials and credentials.credentials else "dev-mode"
-        }
-    except HTTPException:
-        # In development mode, allow unauthenticated access
-        if os.getenv("ENVIRONMENT", "development") == "development":
-            return {
-                "authenticated": False,
-                "mode": "development",
-                "api_key_hash": "dev-mode"
-            }
-        raise
+    # Always verify the API key - no bypasses
+    verify_api_key(credentials)
+    
+    stored_api_key = get_api_key_from_env()
+    environment = os.getenv("ENVIRONMENT", "development")
+    
+    # Determine mode based on whether production key is configured
+    mode = "production" if stored_api_key else "development"
+    
+    return {
+        "authenticated": True,
+        "mode": mode,
+        "environment": environment,
+        "api_key_hash": hash_api_key(credentials.credentials)[:8] if credentials and credentials.credentials else "unknown"
+    }
