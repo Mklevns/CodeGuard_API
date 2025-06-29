@@ -160,4 +160,23 @@ export class CodeGuardAPI {
     async generateReport(files: CodeFile[], format: string = 'markdown', includeAiSuggestions: boolean = true, applyFiltering: boolean = true): Promise<any> {
         return this.generateImprovementReport(files, format, includeAiSuggestions, applyFiltering);
     }
+
+    // Project template methods for VS Code extension
+    async getProjectTemplates(): Promise<any[]> {
+        const response = await this.client.get('/templates');
+        return response.data;
+    }
+
+    async previewProject(templateName: string): Promise<any> {
+        const response = await this.client.get(`/templates/preview?template=${templateName}`);
+        return response.data;
+    }
+
+    async generateProject(templateName: string, projectPath: string): Promise<any> {
+        const response = await this.client.post('/templates/generate', {
+            template_name: templateName,
+            project_path: projectPath
+        });
+        return response.data;
+    }
 }

@@ -91,11 +91,17 @@ class ConfigManager {
         const config = vscode.workspace.getConfiguration('codeguard');
         return config.get('claudeApiKey');
     }
+    async getDeepSeekApiKey() {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get('deepseekApiKey');
+    }
     async getCurrentAiApiKey() {
         const provider = this.getAiProvider();
         switch (provider) {
             case 'openai':
                 return this.getOpenAiApiKey();
+            case 'deepseek':
+                return this.getDeepSeekApiKey();
             case 'gemini':
                 return this.getGeminiApiKey();
             case 'claude':

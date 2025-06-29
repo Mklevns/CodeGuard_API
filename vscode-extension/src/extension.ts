@@ -152,6 +152,18 @@ async function runAuditForDocument(document: vscode.TextDocument) {
 
 async function generateReport() {
     try {
+        const activeEditor = vscode.window.activeTextEditor;
+        if (!activeEditor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+
+        const document = activeEditor.document;
+        if (!document.fileName.endsWith('.py')) {
+            vscode.window.showErrorMessage('Please open a Python file to generate a report');
+            return;
+        }
+
         const result = await vscode.window.showQuickPick([
             { label: 'Markdown Report', value: 'markdown' },
             { label: 'JSON Report', value: 'json' }
@@ -161,7 +173,12 @@ async function generateReport() {
         
         if (!result) return;
         
-        const reportData = await api.generateReport(7, result.value);
+        const files = [{
+            filename: document.fileName.split('/').pop() || 'untitled.py',
+            content: document.getText()
+        }];
+        
+        const reportData = await api.generateReport(files, result.value);
         
         // Create new document with report
         const doc = await vscode.workspace.openTextDocument({
