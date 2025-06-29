@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from models import AuditRequest, AuditResponse
@@ -38,6 +39,9 @@ app.add_middleware(
 # Initialize project generator
 project_generator = MLProjectGenerator()
 
+# Mount static files for the playground
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/")
 async def root():
     """Root endpoint providing basic service information and health check."""
@@ -47,6 +51,7 @@ async def root():
         "version": "1.0.0",
         "description": "Static code analysis service for ML/RL Python code",
         "endpoints": {
+            "playground": "/playground",
             "audit": "/audit",
             "improve_code": "/improve/code",
             "improve_project": "/improve/project", 
@@ -58,6 +63,15 @@ async def root():
             "terms": "/terms-of-service"
         }
     }
+
+@app.get("/playground", response_class=HTMLResponse)
+async def playground():
+    """Serve the CodeGuard Playground web interface."""
+    try:
+        with open("static/index.html", "r") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Playground not found")
 
 @app.post("/audit", response_model=AuditResponse)
 async def audit_code(request: AuditRequest, current_user: dict = Depends(get_current_user)):
