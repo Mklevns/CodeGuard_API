@@ -92,10 +92,15 @@ class CodeGuardPlayground {
         safeAddEventListener('copyFimResult', 'click', () => this.copyFimResult());
         safeAddEventListener('applyFimResult', 'click', () => this.applyFimResult());
 
-        // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
-        });
+        // Tab switching - safely handle tab buttons
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        if (tabButtons.length > 0) {
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+            });
+        } else {
+            console.warn('No tab buttons found on page');
+        }
 
         // Export buttons
         safeAddEventListener('copyImproved', 'click', () => this.copyImprovedCode());
