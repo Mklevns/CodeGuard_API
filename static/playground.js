@@ -64,6 +64,13 @@ class CodeGuardPlayground {
         document.getElementById('auditBtn').addEventListener('click', () => this.auditCode());
         document.getElementById('improveBtn').addEventListener('click', () => this.improveCode());
         document.getElementById('auditImproveBtn').addEventListener('click', () => this.auditAndImprove());
+        document.getElementById('fimBtn').addEventListener('click', () => this.openFimTab());
+        
+        // FIM completion buttons
+        document.getElementById('runFimBtn').addEventListener('click', () => this.runFimCompletion());
+        document.getElementById('loadFimExample').addEventListener('click', () => this.loadFimExample());
+        document.getElementById('copyFimResult').addEventListener('click', () => this.copyFimResult());
+        document.getElementById('applyFimResult').addEventListener('click', () => this.applyFimResult());
 
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -634,6 +641,122 @@ def evaluate_model():
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    // FIM Completion Methods
+    openFimTab() {
+        this.switchTab('fim');
+        document.getElementById('resultsSection').classList.remove('hidden');
+    }
+
+    loadFimExample() {
+        const examplePrefix = `def secure_model_loader(model_path: str):
+    """Load ML model with security checks."""
+    import torch
+    import os
+    
+    # TODO: Add proper validation and security checks`;
+        
+        const exampleSuffix = `    
+    model = torch.load(model_path)
+    return model`;
+        
+        document.getElementById('fimPrefix').value = examplePrefix;
+        document.getElementById('fimSuffix').value = exampleSuffix;
+    }
+
+    async runFimCompletion() {
+        const prefix = document.getElementById('fimPrefix').value.trim();
+        const suffix = document.getElementById('fimSuffix').value.trim();
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const provider = document.getElementById('aiProvider').value;
+        
+        if (!prefix) {
+            alert('Please enter a code prefix');
+            return;
+        }
+        
+        if (provider === 'deepseek' && !apiKey) {
+            alert('DeepSeek API key is required for FIM completion');
+            return;
+        }
+        
+        this.showStatus('Running FIM completion...');
+        
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/improve/fim-completion`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    prefix: prefix,
+                    suffix: suffix,
+                    ai_provider: provider,
+                    ai_api_key: apiKey,
+                    max_tokens: 2000
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            this.displayFimResults(result);
+            this.hideStatus();
+            
+        } catch (error) {
+            this.hideStatus();
+            console.error('FIM completion error:', error);
+            alert(`FIM completion failed: ${error.message}`);
+        }
+    }
+
+    displayFimResults(result) {
+        const fimResult = document.getElementById('fimResult');
+        const completedCode = result.prefix + '\n' + (result.completion || '') + '\n' + result.suffix;
+        fimResult.textContent = completedCode;
+        
+        if (result.confidence_score !== undefined) {
+            document.getElementById('fimConfidenceScore').textContent = Math.round(result.confidence_score * 100);
+            document.getElementById('fimConfidence').classList.remove('hidden');
+        }
+        
+        this.currentFimResult = result;
+        document.getElementById('resultsSection').classList.remove('hidden');
+        this.switchTab('fim');
+    }
+
+    copyFimResult() {
+        if (!this.currentFimResult) return;
+        
+        const completedCode = this.currentFimResult.prefix + '\n' + 
+                             (this.currentFimResult.completion || '') + '\n' + 
+                             this.currentFimResult.suffix;
+        
+        navigator.clipboard.writeText(completedCode).then(() => {
+            const btn = document.getElementById('copyFimResult');
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = originalText, 2000);
+        });
+    }
+
+    applyFimResult() {
+        if (!this.currentFimResult) return;
+        
+        const completedCode = this.currentFimResult.prefix + '\n' + 
+                             (this.currentFimResult.completion || '') + '\n' + 
+                             this.currentFimResult.suffix;
+        
+        document.getElementById('codeInput').value = completedCode;
+        
+        const btn = document.getElementById('applyFimResult');
+        const originalText = btn.textContent;
+        btn.textContent = 'Applied!';
+        setTimeout(() => btn.textContent = originalText, 2000);
     }
 }
 
