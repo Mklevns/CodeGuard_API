@@ -150,6 +150,11 @@
           "type": "string",
           "description": "Your Anthropic Claude API key for AI assistance.",
           "default": ""
+        },
+        "codeguard.deepseekApiKey": {
+          "type": "string",
+          "description": "Your DeepSeek API key for AI code improvements.",
+          "default": ""
         }
       }
     }

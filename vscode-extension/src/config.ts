@@ -120,11 +120,18 @@ export class ConfigManager {
         return config.get<string>('claudeApiKey');
     }
     
+    async getDeepSeekApiKey(): Promise<string | undefined> {
+        const config = vscode.workspace.getConfiguration('codeguard');
+        return config.get<string>('deepseekApiKey');
+    }
+    
     async getCurrentAiApiKey(): Promise<string | undefined> {
         const provider = this.getAiProvider();
         switch (provider) {
             case 'openai':
                 return this.getOpenAiApiKey();
+            case 'deepseek':
+                return this.getDeepSeekApiKey();
             case 'gemini':
                 return this.getGeminiApiKey();
             case 'claude':

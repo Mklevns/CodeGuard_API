@@ -66,7 +66,7 @@ class MultiLLMCodeImprover:
         }
         
         data = {
-            "model": "deepseek-r1",
+            "model": "deepseek-chat",
             "messages": [
                 {
                     "role": "user",
