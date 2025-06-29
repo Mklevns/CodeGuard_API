@@ -1062,9 +1062,9 @@ async def audit_and_improve_combined(request: AuditRequest):
         improvements = {}
         batch_improver = get_batch_improver()
         
-        if request.files and request.ai_api_key:
+        if request.files:
             try:
-                # Create improvement requests for each file with AI provider info
+                # Create improvement requests for each file
                 for file in request.files:
                     from chatgpt_integration import CodeImprovementRequest
                     
@@ -1090,14 +1090,31 @@ async def audit_and_improve_combined(request: AuditRequest):
                         "warnings": improvement.warnings
                     }
             except Exception as e:
-                # If AI improvement fails, still return audit results with error info
+                # If AI improvement fails, apply fallback improvements
                 for file in request.files:
+                    from chatgpt_integration import CodeImprovementRequest
+                    
+                    # Create fallback improvement request
+                    fallback_request = CodeImprovementRequest(
+                        original_code=file.content,
+                        filename=file.filename,
+                        issues=audit_response.issues,
+                        fixes=audit_response.fixes,
+                        improvement_level="moderate",
+                        preserve_functionality=True,
+                        ai_provider="fallback",
+                        ai_api_key=None
+                    )
+                    
+                    code_improver = get_code_improver()
+                    fallback_improvement = code_improver._fallback_improvement(fallback_request)
+                    
                     improvements[file.filename] = {
-                        "improved_code": file.content,  # Return original code
-                        "applied_fixes": [],
-                        "improvement_summary": f"AI improvement failed: {str(e)}",
-                        "confidence_score": 0.0,
-                        "warnings": [f"Could not connect to {request.ai_provider or 'AI provider'}: {str(e)}"]
+                        "improved_code": fallback_improvement.improved_code,
+                        "applied_fixes": fallback_improvement.applied_fixes,
+                        "improvement_summary": f"AI improvement failed: {str(e)}. Applied {len(fallback_improvement.applied_fixes)} automatic fixes.",
+                        "confidence_score": fallback_improvement.confidence_score,
+                        "warnings": fallback_improvement.warnings + [f"Could not connect to {request.ai_provider or 'AI provider'}: {str(e)}"]
                     }
         
         # Calculate improvement statistics

@@ -617,35 +617,114 @@ Return JSON with:
         return "\n".join(formatted)
     
     def _fallback_improvement(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
-        """Fallback improvement when OpenAI is not available."""
+        """Fallback improvement when AI is not available - apply auto-fixable suggestions."""
         
-        # Apply basic auto-fixable improvements
         improved_code = request.original_code
         applied_fixes = []
         
-        # Apply simple fixes that don't require AI
+        # Apply auto-fixable improvements from CodeGuard suggestions
         for fix in request.fixes:
-            if fix.auto_fixable and hasattr(fix, 'replacement_code') and fix.replacement_code:
+            if fix.auto_fixable:
                 try:
-                    # Simple string replacement for auto-fixable issues
-                    if fix.line and fix.line <= len(improved_code.splitlines()):
+                    if fix.replacement_code:
+                        # For fixes that provide complete replacement code
+                        if "import" in fix.suggestion.lower() and "seeding" in fix.suggestion.lower():
+                            # Add seeding at the beginning of the file
+                            lines = improved_code.splitlines()
+                            import_lines = []
+                            code_lines = []
+                            
+                            # Separate imports from code
+                            for line in lines:
+                                if line.strip().startswith('import ') or line.strip().startswith('from '):
+                                    import_lines.append(line)
+                                else:
+                                    code_lines.append(line)
+                            
+                            # Add seeding after imports
+                            seeding_code = fix.replacement_code.strip()
+                            if seeding_code not in improved_code:
+                                improved_code = '\n'.join(import_lines + ['', seeding_code, ''] + code_lines)
+                                applied_fixes.append({
+                                    "type": "seeding",
+                                    "description": "Added random seeding for reproducibility",
+                                    "line": len(import_lines) + 2
+                                })
+                        
+                        elif "logging" in fix.suggestion.lower():
+                            # Replace print statements with logging
+                            improved_code = improved_code.replace('print(', 'logger.info(')
+                            if 'logger.info(' in improved_code and 'import logging' not in improved_code:
+                                # Add logging import and setup
+                                lines = improved_code.splitlines()
+                                import_lines = []
+                                other_lines = []
+                                
+                                for line in lines:
+                                    if line.strip().startswith('import ') or line.strip().startswith('from '):
+                                        import_lines.append(line)
+                                    else:
+                                        other_lines.append(line)
+                                
+                                logging_setup = [
+                                    'import logging',
+                                    '',
+                                    'logging.basicConfig(level=logging.INFO)',
+                                    'logger = logging.getLogger(__name__)',
+                                    ''
+                                ]
+                                
+                                improved_code = '\n'.join(import_lines + logging_setup + other_lines)
+                                applied_fixes.append({
+                                    "type": "logging",
+                                    "description": "Replaced print statements with logging",
+                                    "line": fix.line
+                                })
+                        
+                        elif fix.diff and "black" in fix.suggestion.lower():
+                            # Apply black formatting if replacement code is provided
+                            improved_code = fix.replacement_code
+                            applied_fixes.append({
+                                "type": "formatting",
+                                "description": "Applied code formatting improvements",
+                                "line": 1
+                            })
+                    
+                    elif "unused import" in fix.suggestion.lower():
+                        # Remove unused imports
                         lines = improved_code.splitlines()
-                        lines[fix.line - 1] = fix.replacement_code
-                        improved_code = "\n".join(lines)
-                        applied_fixes.append({
-                            "type": "auto_fix",
-                            "description": fix.suggestion,
-                            "line": fix.line
-                        })
-                except Exception:
+                        if fix.line <= len(lines):
+                            line_content = lines[fix.line - 1]
+                            # Only remove if it's actually an import line
+                            if 'import ' in line_content:
+                                lines.pop(fix.line - 1)
+                                improved_code = '\n'.join(lines)
+                                applied_fixes.append({
+                                    "type": "cleanup",
+                                    "description": "Removed unused import",
+                                    "line": fix.line
+                                })
+                
+                except Exception as e:
+                    # Skip fixes that fail to apply
                     continue
+        
+        # If no fixes were applied, return original code with helpful message
+        if not applied_fixes:
+            return CodeImprovementResponse(
+                improved_code=request.original_code,
+                applied_fixes=[],
+                improvement_summary="No auto-fixable improvements available. AI provider required for advanced code improvements.",
+                confidence_score=0.0,
+                warnings=["AI API key required for comprehensive code improvements. CodeGuard detected issues but cannot automatically fix them without AI assistance."]
+            )
         
         return CodeImprovementResponse(
             improved_code=improved_code,
             applied_fixes=applied_fixes,
-            improvement_summary=f"Applied {len(applied_fixes)} automatic fixes. OpenAI integration not available for advanced improvements.",
-            confidence_score=0.7 if applied_fixes else 0.3,
-            warnings=["OpenAI API key not configured. Only basic auto-fixes applied."]
+            improvement_summary=f"Applied {len(applied_fixes)} automatic fixes from CodeGuard suggestions. For comprehensive AI-powered improvements, please provide a valid API key.",
+            confidence_score=0.6,
+            warnings=["Limited to auto-fixable improvements only. AI provider required for advanced code analysis and improvements."]
         )
     
     def _handle_improvement_error(self, request: CodeImprovementRequest, error: str) -> CodeImprovementResponse:
