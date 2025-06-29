@@ -48,6 +48,36 @@
         "icon": "$(list-selection)"
       },
       {
+        "command": "codeguard.analyzeRepository",
+        "title": "CodeGuard: Analyze GitHub Repository",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "codeguard.improveWithContext",
+        "title": "CodeGuard: Improve with Repository Context",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "codeguard.showCacheStats",
+        "title": "CodeGuard: View Cache Statistics",
+        "icon": "$(database)"
+      },
+      {
+        "command": "codeguard.clearCache",
+        "title": "CodeGuard: Clear Analysis Cache",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "codeguard.configureRules",
+        "title": "CodeGuard: Configure Rules",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "codeguard.systemHealth",
+        "title": "CodeGuard: System Health",
+        "icon": "$(pulse)"
+      },
+      {
         "command": "codeguard.bulkFixByType",
         "title": "CodeGuard: Fix All Issues by Type",
         "icon": "$(symbol-operator)"

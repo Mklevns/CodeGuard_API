@@ -173,4 +173,77 @@ export class CodeGuardAPI {
         });
         return response.data;
     }
+
+    // GitHub context methods
+    async analyzeRepository(repoUrl: string, githubToken?: string): Promise<any> {
+        const requestData: any = { repo_url: repoUrl };
+        if (githubToken) {
+            requestData.github_token = githubToken;
+        }
+        
+        const response = await this.client.post('/repo/analyze', requestData, {
+            timeout: 120000 // 2 minute timeout for repository analysis
+        });
+        return response.data;
+    }
+
+    async improveWithRepositoryContext(repoUrl: string, content: string, filename: string, relativePath: string, githubToken?: string): Promise<any> {
+        const aiProvider = this.configManager.getAiProvider();
+        const aiApiKey = await this.configManager.getCurrentAiApiKey();
+        
+        const requestData: any = {
+            repo_url: repoUrl,
+            file_content: content,
+            filename: filename,
+            target_file_path: relativePath,
+            ai_provider: aiProvider,
+            ai_api_key: aiApiKey
+        };
+        
+        if (githubToken) {
+            requestData.github_token = githubToken;
+        }
+        
+        const response = await this.client.post('/improve/with-related-context', requestData, {
+            timeout: 180000 // 3 minute timeout for context-aware improvements
+        });
+        return response.data;
+    }
+
+    // System management methods
+    async getCacheStats(): Promise<any> {
+        const response = await this.client.get('/cache/stats');
+        return response.data;
+    }
+
+    async clearCache(): Promise<any> {
+        const response = await this.client.post('/cache/clear');
+        return response.data;
+    }
+
+    async getRuleConfiguration(): Promise<any> {
+        const response = await this.client.get('/rules/config');
+        return response.data;
+    }
+
+    async toggleRuleSet(ruleSetName: string, enabled: boolean): Promise<any> {
+        const response = await this.client.post(`/rules/rule-set/${ruleSetName}/toggle`, {
+            enabled
+        });
+        return response.data;
+    }
+
+    async getSystemHealth(): Promise<any> {
+        const response = await this.client.get('/system/health/detailed');
+        return response.data;
+    }
+
+    // Legacy method compatibility
+    async auditCode(files: CodeFile[], options?: AuditOptions): Promise<AuditResponse> {
+        return this.audit(files, options);
+    }
+
+    async generateReport(files: CodeFile[], format: string = 'markdown'): Promise<any> {
+        return this.generateImprovementReport(files, format, false, true);
+    }
 }
