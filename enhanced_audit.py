@@ -289,7 +289,34 @@ class EnhancedAuditEngine:
                 filename=original_filename,
                 line=1,
                 type="error",
-                description="pylint analysis timed out",
+                description="pylint analysis timed out after 60 seconds",
+                source="pylint",
+                severity="warning"
+            ))
+        except subprocess.CalledProcessError as e:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description=f"pylint exited with error code {e.returncode}: {e.stderr if e.stderr else 'Unknown error'}",
+                source="pylint",
+                severity="warning"
+            ))
+        except PermissionError:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description="Permission denied when accessing file for pylint analysis",
+                source="pylint",
+                severity="warning"
+            ))
+        except OSError as e:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description=f"OS error during pylint execution: {str(e)}",
                 source="pylint",
                 severity="warning"
             ))
@@ -302,12 +329,21 @@ class EnhancedAuditEngine:
                 source="pylint",
                 severity="warning"
             ))
+        except UnicodeDecodeError as e:
+            issues.append(Issue(
+                filename=original_filename,
+                line=1,
+                type="error",
+                description=f"Unicode decode error in pylint output: {str(e)}",
+                source="pylint",
+                severity="warning"
+            ))
         except Exception as e:
             issues.append(Issue(
                 filename=original_filename,
                 line=1,
                 type="error",
-                description=f"pylint analysis failed: {str(e)}",
+                description=f"Unexpected pylint error: {type(e).__name__}: {str(e)}",
                 source="pylint",
                 severity="warning"
             ))
