@@ -5,8 +5,9 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from datetime import datetime
-from models import AuditRequest, AuditResponse, CodeFile, AuditOptions
+from models import AuditRequest, AuditResponse, CodeFile, AuditOptions, Issue, Fix
 from audit import analyze_code
+from enhanced_audit import EnhancedAuditEngine
 from auth import verify_api_key, get_current_user
 from analysis_cache import get_file_cache, get_project_cache
 from granular_rule_config import get_rule_manager
@@ -25,6 +26,11 @@ from git_analyzer import analyze_git_history, GitContextRetriever
 from graph_analyzer import analyze_repository_structure
 import uuid
 import time
+import asyncio
+import logging
+import hmac
+from typing import List, Optional
+from pydantic import BaseModel
 
 # Create FastAPI app
 app = FastAPI(
@@ -46,6 +52,101 @@ app.add_middleware(
 # Initialize project generator and Git context retriever
 project_generator = MLProjectGenerator()
 git_context_retriever = GitContextRetriever()
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Enhanced models for the unified improvement endpoint
+class ImprovementRequest(BaseModel):
+    """Unified request model for all code improvement tasks."""
+    files: List[CodeFile]
+    options: Optional[AuditOptions] = None
+    run_audit: bool = True  # If false, issues must be provided
+    issues: Optional[List[Issue]] = None
+    fixes: Optional[List[Fix]] = None
+    ai_provider: Optional[str] = "openai"
+    ai_api_key: Optional[str] = None
+    github_repo_url: Optional[str] = None
+    github_token: Optional[str] = None
+    improvement_level: str = "moderate"
+    preserve_functionality: bool = True
+
+# Centralized audit function with enhanced error handling
+async def _perform_audit(request: AuditRequest, use_filter: bool = True) -> AuditResponse:
+    """
+    Centralized function to run code audit with caching and robust error handling.
+    """
+    try:
+        # Check cache first
+        cache = get_file_cache()
+        cached_results = []
+        files_to_analyze = []
+
+        for file in request.files:
+            cached = cache.get_cached_result(file.filename, file.content)
+            if cached:
+                cached_results.append(cached)
+            else:
+                files_to_analyze.append(file)
+
+        # If all files are cached, return combined results
+        if not files_to_analyze and cached_results:
+            all_issues = [issue for issues, fixes in cached_results for issue in issues]
+            all_fixes = [fix for issues, fixes in cached_results for fix in fixes]
+            return AuditResponse(
+                summary=f"Analysis complete. {len(all_issues)} issues found (served from cache).",
+                issues=all_issues,
+                fixes=all_fixes
+            )
+
+        # Run analysis on remaining files
+        engine = EnhancedAuditEngine(use_false_positive_filter=use_filter)
+        
+        # Create analysis request for uncached files
+        if files_to_analyze:
+            analysis_request = AuditRequest(files=files_to_analyze, options=request.options)
+        else:
+            analysis_request = request
+
+        # Run analysis with timeout
+        analysis_response = await asyncio.wait_for(
+            asyncio.to_thread(engine.analyze_code, analysis_request),
+            timeout=40
+        )
+
+        # Combine cached and new results if both exist
+        if cached_results:
+            cached_issues = [issue for issues, fixes in cached_results for issue in issues]
+            cached_fixes = [fix for issues, fixes in cached_results for fix in fixes]
+            
+            analysis_response.issues.extend(cached_issues)
+            analysis_response.fixes.extend(cached_fixes)
+            
+            # Update summary
+            total_issues = len(analysis_response.issues)
+            analysis_response.summary = f"Analysis complete. {total_issues} issues found."
+
+        return analysis_response
+
+    except asyncio.TimeoutError:
+        logger.error("Analysis timed out after 40 seconds")
+        raise HTTPException(
+            status_code=504, 
+            detail="The code analysis took too long to complete. Please try with smaller files or simpler code."
+        )
+    except FileNotFoundError as e:
+        logger.error(f"Required analysis tool not found: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="A required analysis tool is not installed on the server."
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error during audit: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="An internal error occurred during code analysis. Please try again."
+        )
 
 # Mount static files for the playground
 app.mount("/static", StaticFiles(directory="static"), name="static")

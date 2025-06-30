@@ -18,51 +18,36 @@ def hash_api_key(api_key: str) -> str:
 
 def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> bool:
     """
-    Verify the provided API key against the stored key.
-    
-    Args:
-        credentials: HTTP Bearer token from the request
-        
-    Returns:
-        True if authentication is successful
-        
-    Raises:
-        HTTPException: If authentication fails
+    Verifies the API key. This function is secure in ALL environments.
     """
-    import os
+    # Always get the expected key from environment variables
+    stored_api_key = os.getenv("CODEGUARD_API_KEY")
     
-    # Get stored API key or use development default
-    stored_api_key = get_api_key_from_env()
-    environment = os.getenv("ENVIRONMENT", "development")
-    
-    # Use development key if no production key is set
-    if not stored_api_key and environment == "development":
-        stored_api_key = "codeguard-dev-key-2025"  # Consistent dev key
-    
+    # For development, use a known key if none is set
     if not stored_api_key:
+        environment = os.getenv("ENVIRONMENT", "development")
+        if environment == "development":
+            stored_api_key = "codeguard-dev-key-2025"
+        else:
+            # If no key is set on the server, no requests can be authenticated
+            raise HTTPException(
+                status_code=503, 
+                detail="Service is not configured for authentication."
+            )
+
+    if not credentials or not credentials.credentials:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API key configuration missing",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=401, 
+            detail="API key is required.",
+            headers={"WWW-Authenticate": "Bearer"}
         )
-    
-    if not credentials:
+
+    # Use a secure comparison to prevent timing attacks
+    if not hmac.compare_digest(credentials.credentials, stored_api_key):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API key required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    provided_key = credentials.credentials
-    expected_hash = hash_api_key(stored_api_key)
-    provided_hash = hash_api_key(provided_key)
-    
-    # Use constant-time comparison to prevent timing attacks
-    if not hmac.compare_digest(expected_hash, provided_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=401, 
+            detail="Invalid API key.",
+            headers={"WWW-Authenticate": "Bearer"}
         )
     
     return True
