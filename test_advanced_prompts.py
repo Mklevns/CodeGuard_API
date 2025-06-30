@@ -34,9 +34,9 @@ def process_payment(user_data):
     # Security risk: eval with user input
     config = eval(user_data.get('config', '{}'))
     
-    # Security risk: pickle deserialization
-    with open('user_preferences.pkl', 'rb') as f:
-        prefs = pickle.load(f)
+    # Security fix: use JSON instead of pickle
+    with open('user_preferences.json', 'r') as f:
+        prefs = json.load(f)
     
     # Security risk: command injection
     amount = user_data['amount']

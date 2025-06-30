@@ -315,20 +315,17 @@ class EnhancedAuditEngine:
                 severity="warning"
             ))
         except OSError as e:
+            # Handle both FileNotFoundError and other OS errors
+            if isinstance(e, FileNotFoundError):
+                error_msg = "pylint not found - tool unavailable"
+            else:
+                error_msg = f"OS error during pylint execution: {str(e)}"
+            
             issues.append(Issue(
                 filename=original_filename,
                 line=1,
                 type="error",
-                description=f"OS error during pylint execution: {str(e)}",
-                source="pylint",
-                severity="warning"
-            ))
-        except FileNotFoundError:
-            issues.append(Issue(
-                filename=original_filename,
-                line=1,
-                type="error",
-                description="pylint not found - tool unavailable",
+                description=error_msg,
                 source="pylint",
                 severity="warning"
             ))

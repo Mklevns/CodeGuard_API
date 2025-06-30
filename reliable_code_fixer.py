@@ -23,8 +23,10 @@ class ReliableCodeFixer:
             ],
             'security_fixes': {
                 'pickle.load(': 'torch.load(',
+                'pickle.dump(': 'torch.save(',
+                'pickle.loads(': 'torch.load(',
+                'pickle.dumps(': 'torch.save(',
                 'import pickle': 'import torch',
-                'with open(': 'torch.load(',
                 'eval(': '# SECURITY: eval() removed - use safe parsing',
                 'exec(': '# SECURITY: exec() removed - use safe execution'
             },

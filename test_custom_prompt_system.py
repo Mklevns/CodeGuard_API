@@ -30,9 +30,8 @@ import pickle
 import os
 
 def load_model(model_path):
-    # Security risk: pickle loading
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
+    # Security fix: use torch.load instead of pickle
+    model = torch.load(model_path, map_location='cpu')
     
     # Missing random seeding
     data = torch.randn(100, 10)
