@@ -193,7 +193,7 @@ async def _run_shared_audit(request: AuditRequest, validate_with_ai: bool = True
     Returns:
         AuditResponse with analysis results
     """
-    return await _perform_audit(request, validate_with_ai=validate_with_ai)
+    return await _perform_audit(request, validate_with_ai)
 
 @app.post("/audit", response_model=AuditResponse)
 async def audit_code(request: AuditRequest, current_user: dict = Depends(get_current_user)):
@@ -227,56 +227,7 @@ def _record_audit_telemetry(session_id: str, request: AuditRequest, response: Au
         # Don't let telemetry errors affect audit results
         pass
 
-async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
-    """
-    Analyzes submitted Python code files and returns a report of issues and suggestions.
 
-    Args:
-        request: AuditRequest containing files to analyze
-        validate_with_ai: Whether to apply ChatGPT false positive filtering
-
-    Returns:
-        AuditResponse with summary, issues, and fix suggestions
-
-    Raises:
-        HTTPException: If analysis fails
-    """
-    session_id = str(uuid.uuid4())
-    start_time = time.time()
-
-    try:
-        # Perform code analysis with configurable AI validation and timeout
-        from enhanced_audit import EnhancedAuditEngine
-        import asyncio
-
-        engine = EnhancedAuditEngine(use_false_positive_filter=validate_with_ai)
-        analysis_timeout = 40  # Total analysis timeout in seconds
-
-        try:
-            # Run analysis with timeout
-            response = await asyncio.wait_for(
-                asyncio.to_thread(engine.analyze_code, request),
-                timeout=analysis_timeout
-            )
-        except asyncio.TimeoutError:
-            # Fallback to analysis without AI filtering if timeout
-            if validate_with_ai:
-                print(f"AI validation timed out after {analysis_timeout}s, falling back to standard analysis")
-                engine_fallback = EnhancedAuditEngine(use_false_positive_filter=False)
-                response = engine_fallback.analyze_code(request)
-                response.summary += " (AI validation timed out)"
-            else:
-                raise HTTPException(status_code=504, detail="Analysis timed out")
-
-        # Record telemetry
-        analysis_time = (time.time() - start_time) * 1000
-        _record_audit_telemetry(session_id, request, response, analysis_time)
-
-        return response
-
-    except Exception as e:
-        analysis_time = (time.time() - start_time) * 1000
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.get("/.well-known/openapi.yaml")
 async def get_openapi_spec():
@@ -295,6 +246,73 @@ async def get_deployment_openapi_spec():
         return FileResponse(openapi_path, media_type="application/yaml")
     else:
         raise HTTPException(status_code=404, detail="Deployment OpenAPI specification not found")
+
+@app.post("/improve")
+async def unified_code_improvement(request: ImprovementRequest, current_user: dict = Depends(get_current_user)):
+    """
+    Unified endpoint for all code improvement tasks.
+    - If run_audit is true, performs a full audit first
+    - If run_audit is false, uses provided issues for targeted fixes
+    - Handles repository context automatically if provided
+    """
+    try:
+        if request.run_audit:
+            # Run full audit first
+            audit_request = AuditRequest(files=request.files, options=request.options)
+            audit_response = await _perform_audit(audit_request, True)
+            issues_to_fix = audit_response.issues
+            fixes_to_apply = audit_response.fixes
+            improvement_mode = "comprehensive"
+        elif request.issues:
+            # Use provided issues for targeted fixes
+            issues_to_fix = request.issues
+            fixes_to_apply = request.fixes or []
+            improvement_mode = "targeted"
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Either 'run_audit' must be true or an 'issues' list must be provided."
+            )
+
+        if not issues_to_fix:
+            return {
+                "improved_code": request.files[0].content if request.files else "",
+                "applied_fixes": [],
+                "improvement_summary": "No issues found to fix",
+                "confidence_score": 1.0,
+                "warnings": [],
+                "improvement_mode": improvement_mode
+            }
+
+        # Use AI improvement system
+        improver = get_code_improver()
+        improvement_request = CodeImprovementRequest(
+            original_code=request.files[0].content,
+            filename=request.files[0].filename,
+            issues=issues_to_fix,
+            fixes=fixes_to_apply,
+            improvement_level=request.improvement_level,
+            preserve_functionality=request.preserve_functionality,
+            ai_provider=request.ai_provider or "openai",
+            ai_api_key=request.ai_api_key,
+            github_repo_url=request.github_repo_url,
+            github_token=request.github_token
+        )
+
+        response = improver.improve_code(improvement_request)
+
+        return {
+            "improved_code": response.improved_code,
+            "applied_fixes": response.applied_fixes,
+            "improvement_summary": response.improvement_summary,
+            "confidence_score": response.confidence_score,
+            "warnings": response.warnings,
+            "improvement_mode": improvement_mode
+        }
+
+    except Exception as e:
+        logger.error(f"Code improvement failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Code improvement failed: {str(e)}")
 
 @app.get("/auth/status")
 async def auth_status(current_user: dict = Depends(get_current_user)):
