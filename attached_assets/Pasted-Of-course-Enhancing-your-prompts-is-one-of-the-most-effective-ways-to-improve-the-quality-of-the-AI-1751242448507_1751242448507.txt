@@ -1,0 +1,171 @@
+Of course. Enhancing your prompts is one of the most effective ways to improve the quality of the AI-generated code improvements. By providing more detailed, structured, and targeted prompts, you can guide the model to produce more accurate, relevant, and insightful results.
+
+Here is a deep dive into how you can enhance your prompts for the online models, with a focus on improving the entire code improvement pipeline.
+
+### **1. The "Master" Prompt: A More Advanced General-Purpose Prompt**
+
+Instead of a simple instruction, you can use a more sophisticated "master" prompt that sets a strong context for the model. This prompt can be a template that you fill in with the specific details of each request.
+
+**Key Enhancements:**
+
+  * **Persona-Driven Role-Playing:** Assigning a specific persona to the model (e.g., "a principal software engineer at Google specializing in code security") can significantly improve the quality of the response.
+  * **Structured Input:** Presenting the input in a structured format (like Markdown with headers) makes it easier for the model to parse and understand.
+  * **Explicit Instructions for Explanation:** Demanding a detailed explanation with references to the original code forces the model to justify its changes, which helps in understanding the improvements and reduces the chances of hallucinations.
+  * **Chain-of-Thought (CoT) Prompting:** Asking the model to "think step by step" before providing the final answer encourages a more logical and thorough analysis.
+
+#### **Advanced Prompt Template:**
+
+```
+[SYSTEM]
+You are a world-class Python expert, acting as a principal-level software engineer and security analyst. Your task is to perform a comprehensive review of the provided Python code. You must be meticulous, detail-oriented, and provide clear, actionable feedback.
+
+Your response must be a single JSON object, with no extra text or explanations outside of the JSON structure. The JSON object must have the following keys:
+- "thought_process": A string where you will think step-by-step about the code, analyzing its strengths and weaknesses before deciding on the final improvements.
+- "improved_code": A string containing the full, refactored Python code.
+- "explanation": A markdown-formatted string that details the changes you made. For each change, you must specify the original line number(s) and provide a clear justification for the improvement, categorized by type (e.g., Security, Performance, Readability, Best Practices).
+
+[USER]
+Please analyze and improve the following Python code.
+
+### **File Information**
+- **Filename:** `{filename}`
+- **Project Context:** `{project_description}`  *(e.g., "This is a web backend for a financial services application.")*
+
+### **Repository Context**
+*(This is where your GitHub context comes in)*
+#### File Tree:
+```
+
+{file\_tree}
+
+````
+#### Key Dependencies:
+- `{dependency_1}`
+- `{dependency_2}`
+
+#### Related File Snippets:
+*`utils.py`*
+```python
+{related_file_content_1}
+````
+
+*`models.py`*
+
+```python
+{related_file_content_2}
+```
+
+### **Original Code (`{filename}`)**
+
+```python
+{original_code}
+```
+
+### **Analysis from Static Tools**
+
+*(This leverages your existing audit results)*
+The following issues were identified by static analysis tools:
+
+  - **Pylint:**
+      - `C0103: Variable name "n" doesn't conform to snake_case naming style`
+  - **Bandit:**
+      - `B404: Consider possible security implications of using subprocess.`
+
+### **Your Task**
+
+1.  First, in the `thought_process` field, reason about the code's purpose, the provided context, and the identified issues.
+2.  Then, provide the fully refactored code in the `improved_code` field.
+3.  Finally, provide a detailed, categorized explanation of your changes in the `explanation` field.
+
+<!-- end list -->
+
+```
+
+### **2. Specialized Prompts for Different Improvement Tasks**
+
+While a master prompt is great for general improvements, you can get even better results by using specialized prompts for specific tasks. Your frontend can have different buttons for "Improve Readability," "Enhance Security," or "Optimize Performance," each triggering a different, highly-focused prompt.
+
+#### **A. Security-Focused Audit Prompt**
+
+* **Goal:** To find and fix security vulnerabilities with high precision.
+* **Key Prompting Techniques:**
+    * **Threat Modeling Persona:** The persona is now a security expert.
+    * **Focus on Vulnerability Classes:** Explicitly ask the model to look for common vulnerability classes (OWASP Top 10, CWEs).
+    * **Demand for Evidence:** Ask for the "why" behind a security flaw.
+
+**Example Security Prompt:**
+
+```
+
+[SYSTEM]
+You are a cybersecurity expert specializing in Python application security and penetration testing. Your task is to perform a security-focused audit of the provided code. You must identify potential vulnerabilities, explain the risks, and provide a secure, refactored version of the code.
+
+Your response must be a JSON object with two keys:
+
+  - "vulnerability\_report": A markdown-formatted report detailing each identified vulnerability, its CWE (Common Weakness Enumeration) if applicable, its severity (High, Medium, Low), and a detailed explanation of the risk.
+  - "secure\_code": The refactored code with all identified vulnerabilities patched.
+
+[USER]
+Analyze the following code for security vulnerabilities. The application is a public-facing API that handles user data.
+
+### **Original Code (`{filename}`)**
+
+```python
+{original_code}
+```
+
+Please focus on identifying issues like:
+
+  - Injection flaws (SQL, Command, etc.)
+  - Insecure deserialization
+  - Hardcoded secrets
+  - Insufficient logging and monitoring
+  - Broken access control
+  - Insecure direct object references
+
+<!-- end list -->
+
+```
+
+#### **B. Performance Optimization Prompt**
+
+* **Goal:** To improve the speed and efficiency of the code without sacrificing correctness.
+* **Key Prompting Techniques:**
+    * **Algorithmic and Systems Persona:** The persona is an expert in algorithms, data structures, and system performance.
+    * **Request for Benchmarking:** Ask the model to explain *how* the changes would improve performance (e.g., "reduces time complexity from O(n^2) to O(n log n)").
+    * **Focus on Specific Optimizations:** Guide the model to look for common performance bottlenecks in Python (e.g., inefficient loops, string concatenation, use of appropriate data structures).
+
+**Example Performance Prompt:**
+
+```
+
+[SYSTEM]
+You are a performance engineering expert with deep knowledge of Python's internals and common optimization techniques. Your task is to analyze the provided code and refactor it for maximum performance and memory efficiency.
+
+Your response must be a JSON object with two keys:
+
+  - "performance\_analysis": A markdown-formatted analysis explaining the performance bottlenecks in the original code and how your changes address them. Quantify the improvements where possible (e.g., in terms of time complexity or memory usage).
+  - "optimized\_code": The refactored code.
+
+[USER]
+Optimize the following Python code for performance. The function is expected to process large datasets.
+
+### **Original Code (`{filename}`)**
+
+```python
+{original_code}
+```
+
+Please focus on:
+
+  - Algorithmic complexity
+  - Efficient use of data structures (e.g., lists vs. sets vs. dicts)
+  - Avoiding unnecessary computations in loops
+  - Memory allocation and garbage collection impact
+
+<!-- end list -->
+
+```
+
+By implementing these advanced and specialized prompting strategies, you can significantly elevate the quality and relevance of the AI-powered suggestions in your CodeGuard application, making it a much more powerful tool for developers.
+```
