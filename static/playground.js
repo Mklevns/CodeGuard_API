@@ -34,8 +34,10 @@ class CodeGuardPlayground {
             const element = document.getElementById(elementId);
             if (element) {
                 element.addEventListener(event, handler);
+                return true;
             } else {
                 console.warn(`Element with ID '${elementId}' not found`);
+                return false;
             }
         };
 
@@ -58,14 +60,14 @@ class CodeGuardPlayground {
 
         safeAddEventListener('apiKey', 'input', (e) => {
             const rememberKeyEl = document.getElementById('rememberKey');
-            if (rememberKeyEl && rememberKeyEl.checked) {
+            if (rememberKeyEl && rememberKeyEl.checked && e.target && e.target.value) {
                 localStorage.setItem('codeguard_api_key', e.target.value);
             }
         });
 
         safeAddEventListener('aiProvider', 'change', (e) => {
             const rememberKeyEl = document.getElementById('rememberKey');
-            if (rememberKeyEl && rememberKeyEl.checked) {
+            if (rememberKeyEl && rememberKeyEl.checked && e.target && e.target.value) {
                 localStorage.setItem('codeguard_ai_provider', e.target.value);
             }
         });
@@ -183,8 +185,19 @@ def evaluate_model():
     }
 
     async auditCode() {
-        const code = document.getElementById('codeInput').value.trim();
-        const filename = document.getElementById('filename').value || 'main.py';
+        const codeInputEl = document.getElementById('codeInput');
+        const filenameEl = document.getElementById('filename');
+        const filterEl = document.getElementById('filterFalsePositives');
+        const levelEl = document.getElementById('analysisLevel');
+        
+        if (!codeInputEl || !filenameEl) {
+            console.error('Required form elements not found');
+            alert('Form elements are missing. Please refresh the page.');
+            return;
+        }
+        
+        const code = codeInputEl.value.trim();
+        const filename = filenameEl.value || 'main.py';
         
         if (!code) {
             alert('Please enter some code to analyze');
@@ -194,7 +207,9 @@ def evaluate_model():
         this.showStatus('Running static analysis...');
 
         try {
-            const endpoint = document.getElementById('filterFalsePositives').checked ? '/audit' : '/audit/no-filter';
+            const endpoint = (filterEl && filterEl.checked) ? '/audit' : '/audit/no-filter';
+            const analysisLevel = (levelEl && levelEl.value) ? levelEl.value : 'basic';
+            
             const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
                 method: 'POST',
                 headers: {
@@ -206,7 +221,7 @@ def evaluate_model():
                         content: code
                     }],
                     options: {
-                        level: document.getElementById('analysisLevel').value,
+                        level: analysisLevel,
                         framework: 'auto',
                         target: 'gpu'
                     }
@@ -214,7 +229,8 @@ def evaluate_model():
             });
 
             if (!response.ok) {
-                throw new Error(`Analysis failed: ${response.statusText}`);
+                const errorText = await response.text().catch(() => 'Unknown error');
+                throw new Error(`Analysis failed: ${response.status} ${response.statusText} - ${errorText}`);
             }
 
             const data = await response.json();
@@ -223,17 +239,29 @@ def evaluate_model():
             
         } catch (error) {
             console.error('Audit error:', error);
-            alert(`Analysis failed: ${error.message}`);
+            alert(`Analysis failed: ${error.message || 'Unknown error occurred'}`);
         } finally {
             this.hideStatus();
         }
     }
 
     async improveCode() {
-        const code = document.getElementById('codeInput').value.trim();
-        const filename = document.getElementById('filename').value || 'main.py';
-        const apiKey = document.getElementById('apiKey').value.trim();
-        const aiProvider = document.getElementById('aiProvider').value;
+        const codeInputEl = document.getElementById('codeInput');
+        const filenameEl = document.getElementById('filename');
+        const apiKeyEl = document.getElementById('apiKey');
+        const aiProviderEl = document.getElementById('aiProvider');
+        const levelEl = document.getElementById('analysisLevel');
+        
+        if (!codeInputEl || !filenameEl || !apiKeyEl || !aiProviderEl) {
+            console.error('Required form elements not found');
+            alert('Form elements are missing. Please refresh the page.');
+            return;
+        }
+        
+        const code = codeInputEl.value.trim();
+        const filename = filenameEl.value || 'main.py';
+        const apiKey = apiKeyEl.value.trim();
+        const aiProvider = aiProviderEl.value;
         
         if (!code) {
             alert('Please enter some code to improve');
@@ -303,7 +331,8 @@ def evaluate_model():
             });
 
             if (!improveResponse.ok) {
-                throw new Error(`Code improvement failed: ${improveResponse.statusText}`);
+                const errorText = await improveResponse.text().catch(() => 'Unknown error');
+                throw new Error(`Code improvement failed: ${improveResponse.status} ${improveResponse.statusText} - ${errorText}`);
             }
 
             const improveData = await improveResponse.json();
@@ -335,10 +364,22 @@ def evaluate_model():
     }
 
     async auditAndImprove() {
-        const code = document.getElementById('codeInput').value.trim();
-        const filename = document.getElementById('filename').value || 'main.py';
-        const apiKey = document.getElementById('apiKey').value.trim();
-        const aiProvider = document.getElementById('aiProvider').value;
+        const codeInputEl = document.getElementById('codeInput');
+        const filenameEl = document.getElementById('filename');
+        const apiKeyEl = document.getElementById('apiKey');
+        const aiProviderEl = document.getElementById('aiProvider');
+        const levelEl = document.getElementById('analysisLevel');
+        
+        if (!codeInputEl || !filenameEl || !apiKeyEl || !aiProviderEl) {
+            console.error('Required form elements not found');
+            alert('Form elements are missing. Please refresh the page.');
+            return;
+        }
+        
+        const code = codeInputEl.value.trim();
+        const filename = filenameEl.value || 'main.py';
+        const apiKey = apiKeyEl.value.trim();
+        const aiProvider = aiProviderEl.value;
         
         if (!code) {
             alert('Please enter some code to analyze');
@@ -353,13 +394,14 @@ def evaluate_model():
         this.showStatus('Running comprehensive analysis and AI improvement...');
 
         try {
+            const analysisLevel = (levelEl && levelEl.value) ? levelEl.value : 'basic';
             const payload = {
                 files: [{
                     filename: filename,
                     content: code
                 }],
                 options: {
-                    level: document.getElementById('analysisLevel').value,
+                    level: analysisLevel,
                     framework: 'auto',
                     target: 'gpu'
                 },
@@ -1337,5 +1379,18 @@ Environment: ${health.environment}`;
 
 // Initialize the playground when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new CodeGuardPlayground();
+    try {
+        new CodeGuardPlayground();
+    } catch (error) {
+        console.error('Failed to initialize CodeGuard Playground:', error);
+        // Show user-friendly error message
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4';
+        errorDiv.innerHTML = `
+            <strong>Initialization Error:</strong> 
+            The playground failed to load properly. Please refresh the page.
+            <br><small>Error: ${error.message}</small>
+        `;
+        document.body.insertBefore(errorDiv, document.body.firstChild);
+    }
 });
