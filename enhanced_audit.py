@@ -1124,8 +1124,10 @@ def audit_code_comprehensive(files: List[Dict[str, str]], options: Optional[Dict
     Returns:
         Dict[str, Any]: Auditing results.
     """
-    # Configuration
-    filter_false_positives = options.get("filter_false_positives", True) if options else True
+    # Configuration with defaults
+    if options is None:
+        options = {}
+    filter_false_positives = options.get("filter_false_positives", True)
 
     # Results aggregation
     all_issues = []
