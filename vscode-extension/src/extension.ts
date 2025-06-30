@@ -148,7 +148,7 @@ async function runAuditForDocument(document: vscode.TextDocument) {
             
             progress.report({ increment: 50, message: "Sending to CodeGuard API..." });
             
-            const result = await api.auditCode(files);
+            const result = await api.audit(files);
             
             progress.report({ increment: 80, message: "Processing results..." });
             
@@ -279,7 +279,7 @@ async function improveCurrentFileWithChatGPT() {
             const content = activeEditor.document.getText();
 
             // First get CodeGuard analysis
-            const auditResult = await api.auditCode([{ filename, content }]);
+            const auditResult = await api.audit([{ filename, content }]);
             
             progress.report({ increment: 30, message: "Requesting ChatGPT improvements..." });
 

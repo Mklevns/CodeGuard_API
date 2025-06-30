@@ -22,10 +22,6 @@ class CodeGuardAPI {
         const response = await this.client.post('/audit', requestData);
         return response.data;
     }
-    // Alias method for backwards compatibility with extension
-    async auditCode(files, options) {
-        return this.audit(files, options);
-    }
     async auditWithoutFilter(files, options) {
         const requestData = {
             files,
@@ -96,10 +92,6 @@ class CodeGuardAPI {
         }, { timeout: 120000 }); // 2 minute timeout for report generation
         return response.data;
     }
-    // Alias method for backwards compatibility with extension
-    async generateReport(files, format = 'markdown', includeAiSuggestions = true, applyFiltering = true) {
-        return this.generateImprovementReport(files, format, includeAiSuggestions, applyFiltering);
-    }
     // Project template methods for VS Code extension
     async getProjectTemplates() {
         const response = await this.client.get('/templates');
@@ -115,6 +107,63 @@ class CodeGuardAPI {
             project_path: projectPath
         });
         return response.data;
+    }
+    // GitHub context methods
+    async analyzeRepository(repoUrl, githubToken) {
+        const requestData = { repo_url: repoUrl };
+        if (githubToken) {
+            requestData.github_token = githubToken;
+        }
+        const response = await this.client.post('/repo/analyze', requestData, {
+            timeout: 120000 // 2 minute timeout for repository analysis
+        });
+        return response.data;
+    }
+    async improveWithRepositoryContext(repoUrl, content, filename, relativePath, githubToken) {
+        const aiProvider = this.configManager.getAiProvider();
+        const aiApiKey = await this.configManager.getCurrentAiApiKey();
+        const requestData = {
+            repo_url: repoUrl,
+            file_content: content,
+            filename: filename,
+            target_file_path: relativePath,
+            ai_provider: aiProvider,
+            ai_api_key: aiApiKey
+        };
+        if (githubToken) {
+            requestData.github_token = githubToken;
+        }
+        const response = await this.client.post('/improve/with-related-context', requestData, {
+            timeout: 180000 // 3 minute timeout for context-aware improvements
+        });
+        return response.data;
+    }
+    // System management methods
+    async getCacheStats() {
+        const response = await this.client.get('/cache/stats');
+        return response.data;
+    }
+    async clearCache() {
+        const response = await this.client.post('/cache/clear');
+        return response.data;
+    }
+    async getRuleConfiguration() {
+        const response = await this.client.get('/rules/config');
+        return response.data;
+    }
+    async toggleRuleSet(ruleSetName, enabled) {
+        const response = await this.client.post(`/rules/rule-set/${ruleSetName}/toggle`, {
+            enabled
+        });
+        return response.data;
+    }
+    async getSystemHealth() {
+        const response = await this.client.get('/system/health/detailed');
+        return response.data;
+    }
+    // Legacy method removed - use audit() directly
+    async generateReport(files, format = 'markdown') {
+        return this.generateImprovementReport(files, format, false, true);
     }
 }
 exports.CodeGuardAPI = CodeGuardAPI;
