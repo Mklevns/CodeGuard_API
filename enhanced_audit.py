@@ -9,7 +9,7 @@ import re
 import json
 import difflib
 import uuid
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from models import AuditRequest, AuditResponse, Issue, Fix
 from rule_engine import MLRLRuleEngine
 from rule_loader import CustomRuleEngine
@@ -932,7 +932,6 @@ class EnhancedAuditEngine:
 
         try:
             # Create flag file to prevent multiple runs
-            ```text
             with open(flag_file, 'w') as f:
                 f.write("done")
 

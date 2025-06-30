@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
 from datetime import datetime
-from models import AuditRequest, AuditResponse
+from models import AuditRequest, AuditResponse, CodeFile, AuditOptions
 from audit import analyze_code
 from auth import verify_api_key, get_current_user
 from analysis_cache import get_file_cache, get_project_cache
@@ -843,9 +843,108 @@ async def fim_code_completion(request: dict) -> dict:
 @app.post("/reports/improvement-analysis")
 async def generate_improvement_report(request: dict):
     """
-    Generate a{issue['original_code']}
-```
+    Generate a comprehensive improvement analysis report for code issues.
+    
+    Args:
+        request: Dictionary containing files, options, and report configuration
+        
+    Returns:
+        Detailed report with issues, fixes, and improvement suggestions
+    """
+    try:
+        # Extract request parameters
+        files = request.get('files', [])
+        options = request.get('options', {})
+        format_type = request.get('format', 'markdown')
+        include_ai_suggestions = request.get('include_ai_suggestions', False)
+        
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided for analysis")
+        
+        # Create audit request
+        code_files = [CodeFile(filename=f['filename'], content=f['content']) for f in files]
+        audit_request = AuditRequest(files=code_files, options=AuditOptions(**options))
+        
+        # Perform analysis
+        audit_response = analyze_code(audit_request)
+        
+        # Generate report
+        report_data = _generate_comprehensive_report(audit_response, format_type, include_ai_suggestions)
+        
+        return {
+            "report": report_data,
+            "format": format_type,
+            "total_issues": len(audit_response.issues),
+            "total_fixes": len(audit_response.fixes),
+            "generated_at": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
 
-**Context:**
-```python
-{issue['context']}
+def _generate_comprehensive_report(audit_response: AuditResponse, format_type: str, include_ai: bool) -> str:
+    """Generate comprehensive report in specified format."""
+    if format_type == 'html':
+        return _generate_html_report(audit_response, include_ai)
+    elif format_type == 'json':
+        return _generate_json_report(audit_response, include_ai)
+    else:
+        return _generate_markdown_report(audit_response, include_ai)
+
+def _generate_markdown_report(audit_response: AuditResponse, include_ai: bool) -> str:
+    """Generate Markdown format report."""
+    report = []
+    report.append("# CodeGuard Analysis Report")
+    report.append(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    report.append("")
+    
+    # Summary
+    report.append("## Summary")
+    report.append(f"- **Total Issues**: {len(audit_response.issues)}")
+    report.append(f"- **Total Fixes**: {len(audit_response.fixes)}")
+    report.append(f"- **Security Issues**: {len([i for i in audit_response.issues if i.severity == 'error'])}")
+    report.append("")
+    
+    # Issues by severity
+    for severity in ['error', 'warning', 'info']:
+        issues = [i for i in audit_response.issues if i.severity == severity]
+        if issues:
+            report.append(f"### {severity.title()} Issues ({len(issues)})")
+            for issue in issues:
+                report.append(f"- **{issue.filename}:{issue.line}** - {issue.description}")
+            report.append("")
+    
+    return "\n".join(report)
+
+def _generate_html_report(audit_response: AuditResponse, include_ai: bool) -> str:
+    """Generate HTML format report."""
+    # Basic HTML structure for the report
+    html = f"""
+    <html>
+    <head><title>CodeGuard Analysis Report</title></head>
+    <body>
+    <h1>CodeGuard Analysis Report</h1>
+    <p>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+    <h2>Summary</h2>
+    <ul>
+        <li>Total Issues: {len(audit_response.issues)}</li>
+        <li>Total Fixes: {len(audit_response.fixes)}</li>
+    </ul>
+    </body>
+    </html>
+    """
+    return html
+
+def _generate_json_report(audit_response: AuditResponse, include_ai: bool) -> str:
+    """Generate JSON format report."""
+    import json
+    report_data = {
+        "generated_at": datetime.now().isoformat(),
+        "summary": {
+            "total_issues": len(audit_response.issues),
+            "total_fixes": len(audit_response.fixes)
+        },
+        "issues": [issue.dict() for issue in audit_response.issues],
+        "fixes": [fix.dict() for fix in audit_response.fixes]
+    }
+    return json.dumps(report_data, indent=2)
