@@ -883,7 +883,7 @@ Rules by Severity:
 ${Object.entries(config.configuration.by_severity).map(([severity, count]) => `• ${severity}: ${count}`).join('\n')}
 
 Available Rule Sets:
-${Object.entries(config.rule_sets).map(([name, rules]) => `• ${name}: ${rules.length} rules`).join('\n')}`;
+${Object.entries(config.rule_sets).map(([name, rules]) => `• ${name}: ${Array.isArray(rules) ? rules.length : 'N/A'} rules`).join('\n')}`;
 
             vscode.window.showInformationMessage(summary);
 

@@ -108,7 +108,7 @@ async function runAuditForDocument(document) {
                     content: document.getText()
                 }];
             progress.report({ increment: 50, message: "Sending to CodeGuard API..." });
-            const result = await api.auditCode(files);
+            const result = await api.audit(files);
             progress.report({ increment: 80, message: "Processing results..." });
             // Clear previous diagnostics for this file
             diagnosticsManager.clearForFile(document.uri);
@@ -211,7 +211,7 @@ async function improveCurrentFileWithChatGPT() {
             const filename = activeEditor.document.fileName.split('/').pop() || 'untitled.py';
             const content = activeEditor.document.getText();
             // First get CodeGuard analysis
-            const auditResult = await api.auditCode([{ filename, content }]);
+            const auditResult = await api.audit([{ filename, content }]);
             progress.report({ increment: 30, message: "Requesting ChatGPT improvements..." });
             // Then get ChatGPT improvements
             const improvement = await api.improveCode(content, filename, auditResult.issues, auditResult.fixes);
@@ -676,7 +676,7 @@ Rules by Severity:
 ${Object.entries(config.configuration.by_severity).map(([severity, count]) => `• ${severity}: ${count}`).join('\n')}
 
 Available Rule Sets:
-${Object.entries(config.rule_sets).map(([name, rules]) => `• ${name}: ${rules.length} rules`).join('\n')}`;
+${Object.entries(config.rule_sets).map(([name, rules]) => `• ${name}: ${Array.isArray(rules) ? rules.length : 'N/A'} rules`).join('\n')}`;
             vscode.window.showInformationMessage(summary);
         }
         else if (action.label === 'Enable Rule Set' || action.label === 'Disable Rule Set') {
