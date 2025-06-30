@@ -36,7 +36,7 @@ class CodeGuardPlayground {
                 element.addEventListener(event, handler);
                 return true;
             } else {
-                console.warn(`Element with ID '${elementId}' not found`);
+                console.warn(`Element with ID '${elementId}' not found - skipping event listener`);
                 return false;
             }
         };
@@ -165,13 +165,79 @@ def evaluate_model():
     }
 
     showStatus(message) {
-        document.getElementById('statusText').textContent = message;
-        document.getElementById('statusPanel').classList.remove('hidden');
+        const statusTextEl = document.getElementById('statusText');
+        const statusPanelEl = document.getElementById('statusPanel');
+        if (statusTextEl) statusTextEl.textContent = message;
+        if (statusPanelEl) statusPanelEl.classList.remove('hidden');
         this.hideResults();
     }
 
     hideStatus() {
-        document.getElementById('statusPanel').classList.add('hidden');
+        const statusPanelEl = document.getElementById('statusPanel');
+        if (statusPanelEl) statusPanelEl.classList.add('hidden');
+    }
+
+    showErrorBanner(message, duration = 5000) {
+        // Remove existing error banners
+        const existingBanners = document.querySelectorAll('.error-banner');
+        existingBanners.forEach(banner => banner.remove());
+
+        // Create error banner
+        const errorBanner = document.createElement('div');
+        errorBanner.className = 'error-banner fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
+        errorBanner.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-sm font-medium">${this.escapeHtml(message)}</span>
+                <button class="ml-4 text-red-600 hover:text-red-800" onclick="this.parentElement.parentElement.remove()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(errorBanner);
+
+        // Auto-remove after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                if (errorBanner.parentNode) {
+                    errorBanner.remove();
+                }
+            }, duration);
+        }
+    }
+
+    showSuccessBanner(message, duration = 3000) {
+        // Remove existing success banners
+        const existingBanners = document.querySelectorAll('.success-banner');
+        existingBanners.forEach(banner => banner.remove());
+
+        // Create success banner
+        const successBanner = document.createElement('div');
+        successBanner.className = 'success-banner fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-100 border border-green-400 text-green-700 px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
+        successBanner.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-sm font-medium">${this.escapeHtml(message)}</span>
+            </div>
+        `;
+
+        document.body.appendChild(successBanner);
+
+        // Auto-remove after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                if (successBanner.parentNode) {
+                    successBanner.remove();
+                }
+            }, duration);
+        }
     }
 
     hideResults() {
@@ -239,7 +305,15 @@ def evaluate_model():
             
         } catch (error) {
             console.error('Audit error:', error);
-            alert(`Analysis failed: ${error.message || 'Unknown error occurred'}`);
+            let errorMessage = 'Analysis failed';
+            
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Network connection failed. Please check your internet connection.';
+            } else if (error.message) {
+                errorMessage = `Analysis failed: ${error.message}`;
+            }
+            
+            this.showErrorBanner(errorMessage);
         } finally {
             this.hideStatus();
         }
@@ -357,7 +431,19 @@ def evaluate_model():
             
         } catch (error) {
             console.error('Improvement error:', error);
-            alert(`Code improvement failed: ${error.message}`);
+            let errorMessage = 'Code improvement failed';
+            
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Network connection failed. Please check your internet connection.';
+            } else if (error.message.includes('401')) {
+                errorMessage = 'Invalid API key. Please check your AI provider API key.';
+            } else if (error.message.includes('429')) {
+                errorMessage = 'Rate limit exceeded. Please wait a moment and try again.';
+            } else if (error.message) {
+                errorMessage = `Code improvement failed: ${error.message}`;
+            }
+            
+            this.showErrorBanner(errorMessage);
         } finally {
             this.hideStatus();
         }
@@ -465,7 +551,19 @@ def evaluate_model():
             
         } catch (error) {
             console.error('Audit and improve error:', error);
-            alert(`Analysis failed: ${error.message}`);
+            let errorMessage = 'Analysis failed';
+            
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Network connection failed. Please check your internet connection.';
+            } else if (error.message.includes('401')) {
+                errorMessage = 'Invalid API key. Please check your AI provider API key.';
+            } else if (error.message.includes('429')) {
+                errorMessage = 'Rate limit exceeded. Please wait a moment and try again.';
+            } else if (error.message) {
+                errorMessage = `Analysis failed: ${error.message}`;
+            }
+            
+            this.showErrorBanner(errorMessage);
         } finally {
             this.hideStatus();
         }
@@ -967,16 +1065,24 @@ def evaluate_model():
     }
 
     async analyzeRepository() {
-        const repoUrl = document.getElementById('githubRepoUrl').value.trim();
-        const githubToken = document.getElementById('githubToken').value.trim();
+        const repoUrl = document.getElementById('githubRepoUrl')?.value.trim();
+        const githubToken = document.getElementById('githubToken')?.value.trim();
         const statusEl = document.getElementById('repoStatus');
         const repoInfoEl = document.getElementById('repoInfo');
         const analyzeBtn = document.getElementById('analyzeRepo');
 
-        if (!repoUrl) return;
+        if (!repoUrl) {
+            this.showErrorBanner('Please enter a GitHub repository URL');
+            return;
+        }
 
-        statusEl.innerHTML = '<span class="text-blue-600">Analyzing repository...</span>';
-        analyzeBtn.disabled = true;
+        if (!this.isValidGitHubUrl(repoUrl)) {
+            this.showErrorBanner('Please enter a valid GitHub repository URL (e.g., https://github.com/user/repo)');
+            return;
+        }
+
+        if (statusEl) statusEl.innerHTML = '<span class="text-blue-600">Analyzing repository...</span>';
+        if (analyzeBtn) analyzeBtn.disabled = true;
         
         try {
             const payload = { repo_url: repoUrl };
@@ -990,10 +1096,22 @@ def evaluate_model():
                 body: JSON.stringify(payload)
             });
 
-            const result = await response.json();
+            let result;
+            const contentType = response.headers.get('content-type');
+            
+            try {
+                if (contentType && contentType.includes('application/json')) {
+                    result = await response.json();
+                } else {
+                    const textResponse = await response.text();
+                    throw new Error(`Server returned non-JSON response: ${textResponse.substring(0, 200)}`);
+                }
+            } catch (parseError) {
+                throw new Error(`Failed to parse server response: ${parseError.message}`);
+            }
 
             if (response.ok && result.status === 'success') {
-                statusEl.innerHTML = '<span class="text-green-600">✓ Repository analyzed successfully</span>';
+                if (statusEl) statusEl.innerHTML = '<span class="text-green-600">✓ Repository analyzed successfully</span>';
                 this.displayRepositoryInfo(result);
                 
                 this.repositoryContext = {
@@ -1009,16 +1127,43 @@ def evaluate_model():
                 // Show Smart Context Improve button
                 this.showSmartContextButton();
                 
+                this.showSuccessBanner('Repository analyzed successfully');
+                
+            } else if (response.status === 404) {
+                const errorMsg = 'Repository analysis endpoint not available. This feature may not be implemented yet.';
+                if (statusEl) statusEl.innerHTML = `<span class="text-red-600">✗ ${errorMsg}</span>`;
+                if (repoInfoEl) repoInfoEl.classList.add('hidden');
+                this.showErrorBanner(errorMsg);
+            } else if (response.status === 401) {
+                const errorMsg = 'Authentication failed. Please check your GitHub token.';
+                if (statusEl) statusEl.innerHTML = `<span class="text-red-600">✗ ${errorMsg}</span>`;
+                if (repoInfoEl) repoInfoEl.classList.add('hidden');
+                this.showErrorBanner(errorMsg);
+            } else if (response.status >= 500) {
+                const errorMsg = 'Server error occurred. Please try again later.';
+                if (statusEl) statusEl.innerHTML = `<span class="text-red-600">✗ ${errorMsg}</span>`;
+                if (repoInfoEl) repoInfoEl.classList.add('hidden');
+                this.showErrorBanner(errorMsg);
             } else {
-                statusEl.innerHTML = '<span class="text-red-600">✗ Analysis failed: ' + (result.error || result.detail || 'Unknown error') + '</span>';
-                repoInfoEl.classList.add('hidden');
+                const errorMsg = result?.error || result?.detail || `HTTP ${response.status}: ${response.statusText}`;
+                if (statusEl) statusEl.innerHTML = `<span class="text-red-600">✗ Analysis failed: ${errorMsg}</span>`;
+                if (repoInfoEl) repoInfoEl.classList.add('hidden');
+                this.showErrorBanner(`Repository analysis failed: ${errorMsg}`);
             }
 
         } catch (error) {
-            statusEl.innerHTML = '<span class="text-red-600">✗ Error: ' + error.message + '</span>';
-            repoInfoEl.classList.add('hidden');
+            console.error('Repository analysis error:', error);
+            const errorMsg = error.message || 'Network error occurred';
+            if (statusEl) statusEl.innerHTML = `<span class="text-red-600">✗ Error: ${errorMsg}</span>`;
+            if (repoInfoEl) repoInfoEl.classList.add('hidden');
+            
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                this.showErrorBanner('Network connection failed. Please check your internet connection.');
+            } else {
+                this.showErrorBanner(`Repository analysis failed: ${errorMsg}`);
+            }
         } finally {
-            analyzeBtn.disabled = false;
+            if (analyzeBtn) analyzeBtn.disabled = false;
         }
     }
 
