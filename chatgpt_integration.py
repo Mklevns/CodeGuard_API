@@ -620,25 +620,38 @@ Always provide complete, working code in the improved_code field."""
         # Define provider fallback order
         fallback_providers = self._get_fallback_providers(ai_provider)
         
-        # Try each provider in order
+        # Try each provider in order with robust error handling
         last_error = None
+        attempted_providers = []
+        
         for provider in fallback_providers:
             try:
                 logging.info(f"Attempting code improvement with {provider}")
+                attempted_providers.append(provider)
                 
                 if provider == "deepseek":
                     response = self._improve_with_deepseek(request, custom_prompt_response)
                 elif provider == "openai":
                     response = self._improve_with_openai(request, custom_prompt_response)
+                elif provider == "gemini":
+                    response = self._improve_with_gemini(request, custom_prompt_response)
+                elif provider == "claude":
+                    response = self._improve_with_claude(request, custom_prompt_response)
                 else:
-                    continue  # Skip unknown providers
+                    logging.warning(f"Unknown provider {provider}, skipping")
+                    continue
+                
+                # Validate response before returning
+                if not response or not hasattr(response, 'improved_code'):
+                    raise Exception(f"Invalid response from {provider}")
                 
                 # Add provider info to response
                 if hasattr(response, 'applied_fixes'):
                     response.applied_fixes.append({
                         "type": "provider_info",
                         "description": f"Code improved using {provider.upper()} AI provider",
-                        "fallback_used": provider != ai_provider
+                        "fallback_used": provider != ai_provider,
+                        "attempted_providers": attempted_providers
                     })
                 
                 logging.info(f"Successfully improved code using {provider}")
@@ -652,11 +665,20 @@ Always provide complete, working code in the improved_code field."""
                 if provider == ai_provider:
                     logging.info(f"Primary provider {ai_provider} failed, trying fallback providers")
                 
-                continue  # Try next provider
+                # Add delay between provider attempts to avoid rate limiting
+                import time
+                time.sleep(1)
+                continue
         
         # All providers failed, use fallback improvement
-        logging.error(f"All AI providers failed. Last error: {last_error}")
-        return self._fallback_improvement(request)
+        logging.error(f"All AI providers failed after trying {attempted_providers}. Last error: {last_error}")
+        fallback_response = self._fallback_improvement(request)
+        
+        # Add failure info to fallback response
+        if hasattr(fallback_response, 'warnings'):
+            fallback_response.warnings.append(f"All AI providers failed: {', '.join(attempted_providers)}")
+        
+        return fallback_response
     
     def _enhance_prompt_with_repo_context(self, base_prompt: str, repo_context: str) -> str:
         """Enhance base prompt with repository context information."""
@@ -1152,6 +1174,94 @@ Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not crea
             confidence_score=0.0,
             warnings=[f"ChatGPT integration failed: {error}"]
         )
+    
+    def _improve_with_gemini(self, request: CodeImprovementRequest, custom_prompt_response=None) -> CodeImprovementResponse:
+        """Use Google Gemini for code improvement."""
+        try:
+            import google.generativeai as genai
+            
+            api_key = request.ai_api_key or os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                raise Exception("Gemini API key not available")
+            
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-pro')
+            
+            # Build prompt
+            prompt = self._build_improvement_prompt(request)
+            
+            # Generate response
+            response = model.generate_content(prompt)
+            
+            if not response.text:
+                raise Exception("Empty response from Gemini")
+            
+            # Parse JSON response
+            try:
+                import json
+                result = json.loads(response.text)
+            except json.JSONDecodeError:
+                # Fallback: create structured response from text
+                result = {
+                    "improved_code": response.text,
+                    "applied_fixes": [{"type": "general", "description": "Code improvements applied"}],
+                    "improvement_summary": "Gemini AI improvements",
+                    "confidence_score": 0.8,
+                    "warnings": []
+                }
+            
+            return CodeImprovementResponse(**result)
+            
+        except Exception as e:
+            raise Exception(f"Gemini provider failed: {str(e)}")
+    
+    def _improve_with_claude(self, request: CodeImprovementRequest, custom_prompt_response=None) -> CodeImprovementResponse:
+        """Use Anthropic Claude for code improvement."""
+        try:
+            from anthropic import Anthropic
+            
+            api_key = request.ai_api_key or os.environ.get("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise Exception("Claude API key not available")
+            
+            client = Anthropic(api_key=api_key)
+            
+            # Build prompt
+            prompt = self._build_improvement_prompt(request)
+            
+            # Generate response
+            response = client.messages.create(
+                model="claude-3-sonnet-20240229",
+                max_tokens=4000,
+                temperature=0.1,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            if not response.content:
+                raise Exception("Empty response from Claude")
+            
+            response_text = response.content[0].text
+            
+            # Parse JSON response
+            try:
+                import json
+                result = json.loads(response_text)
+            except json.JSONDecodeError:
+                # Fallback: create structured response from text
+                result = {
+                    "improved_code": response_text,
+                    "applied_fixes": [{"type": "general", "description": "Code improvements applied"}],
+                    "improvement_summary": "Claude AI improvements",
+                    "confidence_score": 0.85,
+                    "warnings": []
+                }
+            
+            return CodeImprovementResponse(**result)
+            
+        except Exception as e:
+            raise Exception(f"Claude provider failed: {str(e)}")
 
 class BatchCodeImprover:
     """Handles batch improvement of multiple files."""
