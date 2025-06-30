@@ -948,3 +948,23 @@ def _generate_json_report(audit_response: AuditResponse, include_ai: bool) -> st
         "fixes": [fix.dict() for fix in audit_response.fixes]
     }
     return json.dumps(report_data, indent=2)
+
+# Server startup
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    host = "0.0.0.0"
+    
+    print(f"Starting CodeGuard API server on {host}:{port}")
+    print(f"Environment: {os.environ.get('ENVIRONMENT', 'development')}")
+    print("Available endpoints:")
+    print(f"  - Health check: http://{host}:{port}/health")
+    print(f"  - API docs: http://{host}:{port}/docs")
+    print(f"  - Playground: http://{host}:{port}/playground")
+    
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        reload=False,  # Disable reload for production stability
+        log_level="info"
+    )
