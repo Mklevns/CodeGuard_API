@@ -561,7 +561,7 @@ Always provide complete, working code in the improved_code field."""
     
     def improve_code(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
         """
-        Use AI provider to implement CodeGuard suggestions and improve code.
+        Use AI provider to implement CodeGuard suggestions and improve code with fallback support.
         
         Args:
             request: Code improvement request with original code and issues
@@ -617,18 +617,46 @@ Always provide complete, working code in the improved_code field."""
                 estimated_effectiveness=min(1.0, custom_prompt_response.estimated_effectiveness + 0.15)
             )
         
-        try:
-            # Route to appropriate AI provider with custom prompt
-            if ai_provider == "deepseek":
-                return self._improve_with_deepseek(request, custom_prompt_response)
-            elif ai_provider == "openai":
-                return self._improve_with_openai(request, custom_prompt_response)
-            else:
-                # Default to OpenAI if provider not recognized
-                return self._improve_with_openai(request)
+        # Define provider fallback order
+        fallback_providers = self._get_fallback_providers(ai_provider)
+        
+        # Try each provider in order
+        last_error = None
+        for provider in fallback_providers:
+            try:
+                logging.info(f"Attempting code improvement with {provider}")
                 
-        except Exception as e:
-            return self._handle_improvement_error(request, str(e))
+                if provider == "deepseek":
+                    response = self._improve_with_deepseek(request, custom_prompt_response)
+                elif provider == "openai":
+                    response = self._improve_with_openai(request, custom_prompt_response)
+                else:
+                    continue  # Skip unknown providers
+                
+                # Add provider info to response
+                if hasattr(response, 'applied_fixes'):
+                    response.applied_fixes.append({
+                        "type": "provider_info",
+                        "description": f"Code improved using {provider.upper()} AI provider",
+                        "fallback_used": provider != ai_provider
+                    })
+                
+                logging.info(f"Successfully improved code using {provider}")
+                return response
+                
+            except Exception as e:
+                last_error = e
+                logging.warning(f"{provider.upper()} provider failed: {str(e)}")
+                
+                # If this was the requested provider, log the fallback
+                if provider == ai_provider:
+                    logging.info(f"Primary provider {ai_provider} failed, trying fallback providers")
+                
+                continue  # Try next provider
+        
+        # All providers failed, use fallback improvement
+        logging.error(f"All AI providers failed. Last error: {last_error}")
+        return self._fallback_improvement(request)
     
     def _enhance_prompt_with_repo_context(self, base_prompt: str, repo_context: str) -> str:
         """Enhance base prompt with repository context information."""
@@ -650,6 +678,40 @@ Always provide complete, working code in the improved_code field."""
         enhanced_parts.append("- Apply project-specific best practices and coding standards")
         
         return '\n'.join(enhanced_parts)
+    
+    def _get_fallback_providers(self, primary_provider: str) -> List[str]:
+        """Get ordered list of providers to try, starting with primary."""
+        # Available providers based on API keys
+        available_providers = []
+        
+        # Check which providers have API keys available
+        if os.environ.get("OPENAI_API_KEY") or primary_provider == "openai":
+            available_providers.append("openai")
+        if os.environ.get("DEEPSEEK_API_KEY") or primary_provider == "deepseek":
+            available_providers.append("deepseek")
+        if os.environ.get("GEMINI_API_KEY") or primary_provider == "gemini":
+            available_providers.append("gemini")
+        if os.environ.get("ANTHROPIC_API_KEY") or primary_provider == "claude":
+            available_providers.append("claude")
+        
+        # If no API keys found, include primary anyway (might have custom key)
+        if not available_providers:
+            available_providers = [primary_provider, "openai", "deepseek"]
+        
+        # Ensure primary provider is first
+        fallback_order = [primary_provider]
+        
+        # Add other available providers as fallbacks
+        for provider in available_providers:
+            if provider not in fallback_order:
+                fallback_order.append(provider)
+        
+        # Ensure we have at least openai and deepseek as fallbacks
+        for default_provider in ["openai", "deepseek"]:
+            if default_provider not in fallback_order:
+                fallback_order.append(default_provider)
+        
+        return fallback_order
     
     def _improve_with_openai(self, request: CodeImprovementRequest, custom_prompt_response=None) -> CodeImprovementResponse:
         """Use OpenAI GPT-4o for code improvement."""
@@ -941,7 +1003,7 @@ Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not crea
         return "\n".join(formatted)
     
     def _fallback_improvement(self, request: CodeImprovementRequest) -> CodeImprovementResponse:
-        """Fallback improvement when AI is not available - apply auto-fixable suggestions."""
+        """Fallback improvement when all AI providers are unavailable - apply auto-fixable suggestions."""
         
         improved_code = request.original_code
         applied_fixes = []
@@ -953,15 +1015,27 @@ Fix THIS EXACT Python code by applying the specific CodeGuard fixes. Do not crea
             reliable_fixer = create_reliable_fixer()
             result = reliable_fixer.fix_code(request.original_code, request.issues)
             
+            # Add fallback info to applied fixes
+            fallback_fixes = result.get("applied_fixes", [])
+            fallback_fixes.append({
+                "type": "fallback_info",
+                "description": "All AI providers failed - applied automated fixes only",
+                "providers_attempted": self._get_fallback_providers(request.ai_provider or "openai")
+            })
+            
             return CodeImprovementResponse(
                 improved_code=result.get("improved_code", request.original_code),
-                applied_fixes=result.get("applied_fixes", []),
-                improvement_summary=result.get("improvement_summary", "Applied automated fallback fixes"),
-                confidence_score=result.get("confidence_score", 0.7),
-                warnings=result.get("warnings", []) + ["AI provider unavailable - using automated fixes only"]
+                applied_fixes=fallback_fixes,
+                improvement_summary=result.get("improvement_summary", "Applied automated fallback fixes - AI providers unavailable"),
+                confidence_score=result.get("confidence_score", 0.4),  # Lower confidence for automated-only fixes
+                warnings=result.get("warnings", []) + [
+                    "All AI providers unavailable - using automated fixes only",
+                    "For comprehensive AI improvements, ensure valid API keys are configured"
+                ]
             )
         except Exception as e:
             # If automated fixer fails, apply manual fixes
+            logging.error(f"Reliable code fixer also failed: {e}")
             pass
         
         # Apply auto-fixable improvements from CodeGuard suggestions
