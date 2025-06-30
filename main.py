@@ -84,11 +84,11 @@ async def playground():
 async def _run_shared_audit(request: AuditRequest, validate_with_ai: bool = True) -> AuditResponse:
     """
     Shared audit logic used by multiple endpoints.
-    
+
     Args:
         request: AuditRequest containing files to analyze
         validate_with_ai: Whether to apply ChatGPT false positive filtering
-        
+
     Returns:
         AuditResponse with analysis results
     """
@@ -113,13 +113,13 @@ def _record_audit_telemetry(session_id: str, request: AuditRequest, response: Au
     try:
         request_analysis = metrics_analyzer.analyze_request(request)
         response_analysis = metrics_analyzer.analyze_response(response)
-        
+
         session = metrics_analyzer.create_session(
             session_id, request_analysis, response_analysis, analysis_time
         )
         telemetry_collector.record_audit_session(session)
         telemetry_collector.record_error_patterns(session_id, response.issues)
-        
+
         if request_analysis['primary_framework']:
             telemetry_collector.record_framework_usage(request_analysis['primary_framework'])
     except Exception:
@@ -129,28 +129,28 @@ def _record_audit_telemetry(session_id: str, request: AuditRequest, response: Au
 async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
     """
     Analyzes submitted Python code files and returns a report of issues and suggestions.
-    
+
     Args:
         request: AuditRequest containing files to analyze
         validate_with_ai: Whether to apply ChatGPT false positive filtering
-        
+
     Returns:
         AuditResponse with summary, issues, and fix suggestions
-        
+
     Raises:
         HTTPException: If analysis fails
     """
     session_id = str(uuid.uuid4())
     start_time = time.time()
-    
+
     try:
         # Perform code analysis with configurable AI validation and timeout
         from enhanced_audit import EnhancedAuditEngine
         import asyncio
-        
+
         engine = EnhancedAuditEngine(use_false_positive_filter=validate_with_ai)
         analysis_timeout = 40  # Total analysis timeout in seconds
-        
+
         try:
             # Run analysis with timeout
             response = await asyncio.wait_for(
@@ -166,13 +166,13 @@ async def _perform_audit(request: AuditRequest, validate_with_ai: bool = True):
                 response.summary += " (AI validation timed out)"
             else:
                 raise HTTPException(status_code=504, detail="Analysis timed out")
-        
+
         # Record telemetry
         analysis_time = (time.time() - start_time) * 1000
         _record_audit_telemetry(session_id, request, response, analysis_time)
-        
+
         return response
-        
+
     except Exception as e:
         analysis_time = (time.time() - start_time) * 1000
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
@@ -270,7 +270,7 @@ async def get_framework_metrics():
             framework_stats = dict(telemetry_collector.memory_frameworks)
         else:
             framework_stats = {}
-        
+
         return {
             "status": "success",
             "frameworks": framework_stats,
@@ -299,12 +299,12 @@ async def export_analytics_report(days: int = 7, format: str = "markdown"):
         dashboard_instance = get_dashboard()
         data = dashboard_instance.generate_dashboard_data(days)
         report = dashboard_instance.export_report(data, format)
-        
+
         if format.lower() == "markdown":
             return {"status": "success", "report": report, "format": "markdown"}
         else:
             return {"status": "success", "report": report, "format": format}
-            
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to export report: {str(e)}")
 
@@ -341,10 +341,10 @@ async def query_past_audits(request: dict):
         query = request.get("query", "")
         if not query:
             raise HTTPException(status_code=400, detail="Query parameter is required")
-        
+
         gpt_conn = get_gpt_connector()
         result = gpt_conn.query_audits(query)
-        
+
         return {
             "status": "success",
             "query_result": {
@@ -363,13 +363,13 @@ async def explain_code_issue(request: dict):
     try:
         issue = request.get("issue", "")
         context = request.get("context", "")
-        
+
         if not issue:
             raise HTTPException(status_code=400, detail="Issue parameter is required")
-        
+
         explainer = get_issue_explainer()
         explanation = explainer.explain_issue(issue, context)
-        
+
         return {
             "status": "success",
             "explanation": explanation
@@ -411,18 +411,18 @@ async def generate_project(request: dict):
         template_name = request.get("template_name") or request.get("template")
         project_path = request.get("project_path")
         custom_config = request.get("custom_config") or request.get("config", {})
-        
+
         if not template_name:
             raise HTTPException(status_code=400, detail="Template name is required")
         if not project_path:
             raise HTTPException(status_code=400, detail="Project path is required")
-        
+
         result = project_generator.generate_project(
             template_name=template_name,
             project_path=project_path,
             custom_config=custom_config
         )
-        
+
         return {
             "status": "success",
             "project": result
@@ -437,16 +437,16 @@ async def preview_project_structure(request: dict):
     """Preview what files and directories would be created for a template."""
     try:
         template_name = request.get("template")
-        
+
         if not template_name:
             raise HTTPException(status_code=400, detail="Template name is required")
-        
+
         details = project_generator.get_template_details(template_name)
-        
+
         # Generate requirements preview
         template_obj = project_generator.templates[template_name]
         requirements_content = project_generator._generate_requirements(template_obj)
-        
+
         return {
             "status": "success",
             "preview": {
@@ -486,11 +486,11 @@ async def terms_of_service():
 async def improve_code_universal(request: dict):
     """
     UNIVERSAL CODE IMPROVEMENT: RESTful endpoint that accepts optional audit results.
-    
+
     If audit_results are provided:
     - Applies targeted improvements to known issues (fast)
     - Preserves code structure by default
-    
+
     If audit_results are NOT provided:
     - Runs full audit first, then applies improvements (comprehensive)
     - Equivalent to the old /audit-and-improve endpoint
@@ -505,14 +505,14 @@ async def improve_code_universal(request: dict):
         ai_api_key = request.get("ai_api_key")
         target_lines = request.get("target_lines", [])
         preserve_structure = request.get("preserve_structure", True)
-        
+
         if not original_code:
             raise HTTPException(status_code=400, detail="Code content is required")
-        
+
         # If audit results not provided, run audit first
         if not audit_results:
             from models import CodeFile, AuditOptions
-            
+
             # Create audit request
             audit_request = AuditRequest(
                 files=[CodeFile(filename=filename, content=original_code)],
@@ -524,21 +524,21 @@ async def improve_code_universal(request: dict):
                 ai_provider=ai_provider,
                 ai_api_key=ai_api_key
             )
-            
+
             # Run shared audit logic
             audit_response = await _run_shared_audit(audit_request, validate_with_ai=True)
-            
+
             # Extract issues and fixes
             issues = [issue.dict() for issue in audit_response.issues]
             fixes = [fix.dict() for fix in audit_response.fixes]
-            
+
             improvement_mode = "comprehensive"
         else:
             # Use provided audit results
             issues = audit_results.get("issues", [])
             fixes = audit_results.get("fixes", [])
             improvement_mode = "targeted"
-            
+
             if not issues:
                 return {
                     "improved_code": original_code,
@@ -548,7 +548,7 @@ async def improve_code_universal(request: dict):
                     "warnings": [],
                     "improvement_mode": improvement_mode
                 }
-        
+
         # Convert dict issues/fixes to model objects for compatibility
         from models import Issue, Fix
         issue_objects = [
@@ -561,7 +561,7 @@ async def improve_code_universal(request: dict):
                 severity=issue.get("severity", "warning")
             ) for issue in issues
         ]
-        
+
         fix_objects = [
             Fix(
                 filename=fix.get("filename", filename),
@@ -572,11 +572,11 @@ async def improve_code_universal(request: dict):
                 auto_fixable=fix.get("auto_fixable", False)
             ) for fix in fixes
         ]
-        
+
         # Filter issues to only requested lines if specified
         if target_lines:
             issue_objects = [issue for issue in issue_objects if issue.line in target_lines]
-            
+
         # Use multi-AI manager for better performance and fallback
         multi_ai = get_multi_ai_manager()
         improvement_request = CodeImprovementRequest(
@@ -587,13 +587,13 @@ async def improve_code_universal(request: dict):
             improvement_level="conservative" if preserve_structure else improvement_level,
             preserve_functionality=preserve_structure
         )
-        
+
         response = await multi_ai.improve_code_with_provider(
             improvement_request, 
             provider_name=ai_provider,
             api_key=ai_api_key
         )
-        
+
         return {
             "improved_code": response.improved_code,
             "applied_fixes": response.applied_fixes,
@@ -606,7 +606,7 @@ async def improve_code_universal(request: dict):
             "improvement_mode": improvement_mode,
             "audit_was_run": audit_results is None
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Code improvement failed: {str(e)}")
 
@@ -622,7 +622,7 @@ async def improve_code_with_ai(request: dict):
             "issues": request.get("issues", []),
             "fixes": request.get("fixes", [])
         }
-    
+
     return await improve_code_universal(request)
 
 def _categorize_fixes_by_type(issues):
@@ -654,13 +654,13 @@ async def apply_bulk_fixes(request: dict):
         issues = request.get("issues", [])
         ai_provider = request.get("ai_provider", "openai")
         ai_api_key = request.get("ai_api_key")
-        
+
         if not original_code or not fix_type:
             raise HTTPException(status_code=400, detail="Code content and fix type are required")
-        
+
         # Filter issues by the specified type
         filtered_issues = [issue for issue in issues if issue.get("type") == fix_type]
-        
+
         if not filtered_issues:
             return {
                 "improved_code": original_code,
@@ -670,7 +670,7 @@ async def apply_bulk_fixes(request: dict):
                 "warnings": [],
                 "fixed_lines": []
             }
-        
+
         # Create focused improvement request for this fix type
         from models import Issue, Fix
         issue_objects = [
@@ -683,7 +683,7 @@ async def apply_bulk_fixes(request: dict):
                 severity=issue.get("severity", "warning")
             ) for issue in filtered_issues
         ]
-        
+
         improvement_request = CodeImprovementRequest(
             original_code=original_code,
             filename=filename,
@@ -692,7 +692,7 @@ async def apply_bulk_fixes(request: dict):
             improvement_level="moderate",
             preserve_functionality=True
         )
-        
+
         # Use multi-AI manager for bulk fixing
         multi_ai = get_multi_ai_manager()
         response = await multi_ai.improve_code_with_provider(
@@ -700,7 +700,7 @@ async def apply_bulk_fixes(request: dict):
             provider_name=ai_provider,
             api_key=ai_api_key
         )
-        
+
         return {
             "improved_code": response.improved_code,
             "applied_fixes": response.applied_fixes,
@@ -711,7 +711,7 @@ async def apply_bulk_fixes(request: dict):
             "fix_type": fix_type,
             "instances_fixed": len(filtered_issues)
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bulk fix failed: {str(e)}")
 
@@ -723,13 +723,13 @@ async def generate_custom_prompt(request: dict) -> dict:
         issues = request.get("issues", [])
         fixes = request.get("fixes", [])
         ai_provider = request.get("ai_provider", "openai")
-        
+
         if not files:
             raise HTTPException(status_code=400, detail="Files are required for prompt generation")
-        
+
         # Convert to proper objects
         from models import CodeFile, Issue, Fix
-        
+
         code_files = [CodeFile(filename=f.get("filename", ""), content=f.get("content", "")) for f in files]
         issue_objects = [Issue(
             filename=i.get("filename", ""),
@@ -739,7 +739,7 @@ async def generate_custom_prompt(request: dict) -> dict:
             source=i.get("source", "unknown"),
             severity=i.get("severity", "warning")
         ) for i in issues]
-        
+
         # Generate custom prompt using LLM
         prompt_generator = get_llm_prompt_generator()
         result = prompt_generator.generate_custom_prompt(
@@ -748,7 +748,7 @@ async def generate_custom_prompt(request: dict) -> dict:
             code_files=code_files,
             ai_provider=ai_provider
         )
-        
+
         return {
             "status": "success",
             "custom_prompt": result.system_prompt,
@@ -760,7 +760,7 @@ async def generate_custom_prompt(request: dict) -> dict:
             "frameworks_detected": len([f for f in code_files if any(pattern in f.content for pattern in ["torch", "tensorflow", "gym", "sklearn"])]),
             "ai_provider": ai_provider
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prompt generation failed: {str(e)}")
 
@@ -773,19 +773,19 @@ async def fim_code_completion(request: dict) -> dict:
         ai_provider = request.get("ai_provider", "deepseek")
         ai_api_key = request.get("ai_api_key")
         max_tokens = request.get("max_tokens", 2000)
-        
+
         if not prefix:
             raise HTTPException(status_code=400, detail="Prefix is required for FIM completion")
-        
+
         if ai_provider.lower() != "deepseek":
             raise HTTPException(status_code=400, detail="FIM completion currently only supports DeepSeek")
-        
+
         # Use DeepSeek FIM completion
         improver = get_code_improver()
-        
+
         # Create a prompt that will trigger FIM completion
         fim_prompt = f"```python\n{prefix}\n# TODO: Complete implementation\n{suffix}\n```"
-        
+
         # Create a basic improvement request for FIM
         improvement_request = CodeImprovementRequest(
             original_code=fim_prompt,
@@ -796,27 +796,27 @@ async def fim_code_completion(request: dict) -> dict:
             ai_provider=ai_provider,
             ai_api_key=ai_api_key
         )
-        
+
         # Call the FIM-enhanced DeepSeek integration
         api_key = ai_api_key or os.getenv('DEEPSEEK_API_KEY')
         if not api_key:
             raise HTTPException(status_code=400, detail="DeepSeek API key required for FIM completion")
-            
+
         response = improver._call_deepseek_fim_completion(fim_prompt, api_key)
-        
+
         # Parse response
         import json
         try:
             result = json.loads(response)
             completed_code = result.get("improved_code", "")
-            
+
             # Extract just the completion part
             if "```python" in completed_code:
                 start = completed_code.find("```python") + 9
                 end = completed_code.find("```", start)
                 if end != -1:
                     completed_code = completed_code[start:end].strip()
-            
+
             return {
                 "prefix": prefix,
                 "suffix": suffix,
@@ -825,7 +825,7 @@ async def fim_code_completion(request: dict) -> dict:
                 "applied_fixes": result.get("applied_fixes", []),
                 "warnings": result.get("warnings", [])
             }
-            
+
         except json.JSONDecodeError:
             # If response isn't JSON, return raw completion
             return {
@@ -836,1896 +836,16 @@ async def fim_code_completion(request: dict) -> dict:
                 "applied_fixes": [],
                 "warnings": ["Raw completion returned"]
             }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"FIM completion failed: {str(e)}")
 
 @app.post("/reports/improvement-analysis")
 async def generate_improvement_report(request: dict):
     """
-    Generate a comprehensive improvement report showing all issues with original code,
-    line numbers, and detailed recommendations for fixes.
-    """
-    try:
-        files = request.get("files", [])
-        include_ai_suggestions = request.get("include_ai_suggestions", True)
-        report_format = request.get("format", "markdown")  # markdown, json, html
-        apply_filtering = request.get("apply_false_positive_filtering", True)  # Filter out common false positives
-        
-        if not files:
-            raise HTTPException(status_code=400, detail="Files are required for analysis")
-        
-        # Perform comprehensive audit using existing audit endpoint
-        audit_data = {
-            "files": files,
-            "options": {
-                "analysis_level": "strict",
-                "framework": "general",
-                "target_platform": "general"
-            }
-        }
-        
-        # Use the existing audit engine with false positive filtering
-        from enhanced_audit import EnhancedAuditEngine
-        from models import AuditRequest, CodeFile, AuditOptions
-        from false_positive_filter import get_false_positive_filter
-        
-        audit_engine = EnhancedAuditEngine(use_false_positive_filter=True)
-        audit_request = AuditRequest(
-            files=[CodeFile(filename=f["filename"], content=f["content"]) for f in files],
-            options=AuditOptions(level="strict", framework="general", target="general")
-        )
-        
-        # Get raw audit results
-        audit_response = audit_engine.analyze_code(audit_request)
-        
-        # Apply false positive filtering if requested (uses fast rule-based filtering, no ChatGPT calls)
-        if apply_filtering:
-            false_positive_filter = get_false_positive_filter()
-            filtered_issues, filtered_fixes = false_positive_filter.filter_issues(
-                audit_response.issues, 
-                audit_response.fixes, 
-                audit_request.files
-            )
-            
-            # Update audit response with filtered results
-            audit_response.issues = filtered_issues
-            audit_response.fixes = filtered_fixes
-            audit_response.summary = f"Found {len(filtered_issues)} issues across {len(files)} files (after filtering)"
-        else:
-            audit_response.summary = f"Found {len(audit_response.issues)} issues across {len(files)} files (unfiltered)"
-        
-        # Generate AI improvement suggestions if requested
-        ai_suggestions = {}
-        if include_ai_suggestions:
-            multi_ai = get_multi_ai_manager()
-            for file_data in files:
-                filename = file_data["filename"]
-                content = file_data["content"]
-                
-                # Get file-specific issues
-                file_issues = [issue for issue in audit_response.issues if issue.filename == filename]
-                
-                if file_issues:
-                    # Create improvement request
-                    improvement_request = CodeImprovementRequest(
-                        original_code=content,
-                        filename=filename,
-                        issues=file_issues[:10],  # Limit to top 10 issues for performance
-                        fixes=[],
-                        improvement_level="moderate"
-                    )
-                    
-                    try:
-                        ai_response = await multi_ai.improve_code_with_provider(improvement_request, "openai")
-                        ai_suggestions[filename] = {
-                            "improved_code": ai_response.improved_code,
-                            "summary": ai_response.improvement_summary,
-                            "confidence": ai_response.confidence_score
-                        }
-                    except Exception as e:
-                        ai_suggestions[filename] = {
-                            "error": f"AI analysis failed: {str(e)}",
-                            "improved_code": content,
-                            "summary": "Manual review recommended",
-                            "confidence": 0.0
-                        }
-        
-        # Generate the report
-        report_data = _generate_improvement_report_data(audit_response, files, ai_suggestions)
-        
-        if report_format == "markdown":
-            formatted_report = _format_report_as_markdown(report_data)
-        elif report_format == "html":
-            formatted_report = _format_report_as_html(report_data)
-        else:  # json
-            formatted_report = report_data
-        
-        return {
-            "report": formatted_report,
-            "format": report_format,
-            "total_issues": len(audit_response.issues),
-            "total_files": len(files),
-            "severity_breakdown": _get_severity_breakdown(audit_response.issues),
-            "issue_categories": _categorize_fixes_by_type([issue.__dict__ for issue in audit_response.issues]),
-            "ai_suggestions_included": include_ai_suggestions
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
-
-def _generate_improvement_report_data(audit_response, files, ai_suggestions):
-    """Generate structured report data"""
-    files_dict = {f["filename"]: f["content"] for f in files}
-    
-    report_data = {
-        "title": "CodeGuard Improvement Analysis Report",
-        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "summary": {
-            "total_files": len(files),
-            "total_issues": len(audit_response.issues),
-            "total_fixes": len(audit_response.fixes)
-        },
-        "files": []
-    }
-    
-    # Group issues by file
-    files_with_issues = {}
-    for issue in audit_response.issues:
-        filename = issue.filename
-        if filename not in files_with_issues:
-            files_with_issues[filename] = []
-        files_with_issues[filename].append(issue)
-    
-    # Process each file
-    for filename, content in files_dict.items():
-        file_issues = files_with_issues.get(filename, [])
-        lines = content.split('\n')
-        
-        file_data = {
-            "filename": filename,
-            "line_count": len(lines),
-            "issue_count": len(file_issues),
-            "issues": [],
-            "ai_suggestion": ai_suggestions.get(filename, {})
-        }
-        
-        # Process each issue
-        for issue in file_issues:
-            line_num = issue.line
-            original_line = lines[line_num - 1] if 0 < line_num <= len(lines) else ""
-            
-            # Get context (2 lines before and after)
-            context_start = max(0, line_num - 3)
-            context_end = min(len(lines), line_num + 2)
-            context_lines = []
-            
-            for i in range(context_start, context_end):
-                prefix = ">>> " if i == line_num - 1 else "    "
-                context_lines.append(f"{prefix}{i+1:3d}: {lines[i]}")
-            
-            issue_data = {
-                "line": line_num,
-                "type": issue.type,
-                "severity": issue.severity,
-                "source": issue.source,
-                "description": issue.description,
-                "original_code": original_line.strip(),
-                "context": "\n".join(context_lines),
-                "recommendations": _get_issue_recommendations(issue)
-            }
-            
-            file_data["issues"].append(issue_data)
-        
-        # Sort issues by line number
-        file_data["issues"].sort(key=lambda x: x["line"])
-        report_data["files"].append(file_data)
-    
-    return report_data
-
-def _get_issue_recommendations(issue):
-    """Get specific recommendations for different issue types"""
-    recommendations = {
-        "syntax": "Fix syntax error according to Python language specification",
-        "style": "Follow PEP 8 style guidelines for consistent code formatting",
-        "security": "Address security vulnerability to prevent potential exploits",
-        "performance": "Optimize code for better runtime performance",
-        "ml_pattern": "Apply machine learning best practices and patterns",
-        "rl_pattern": "Follow reinforcement learning coding standards"
-    }
-    
-    # Get specific recommendations based on issue details
-    if "import" in issue.description.lower():
-        return "Organize imports according to PEP 8: standard library, third-party, local imports"
-    elif "unused" in issue.description.lower():
-        return "Remove unused variables/imports to improve code cleanliness"
-    elif "line too long" in issue.description.lower():
-        return "Break long lines at 88 characters using parentheses or line continuation"
-    elif "missing docstring" in issue.description.lower():
-        return "Add descriptive docstrings following Google or NumPy style"
-    elif "complexity" in issue.description.lower():
-        return "Reduce cyclomatic complexity by extracting functions or simplifying logic"
-    
-    return recommendations.get(issue.type, "Review and fix according to coding standards")
-
-def _format_report_as_markdown(report_data):
-    """Format report data as Markdown"""
-    md = f"""# {report_data['title']}
-
-**Generated:** {report_data['generated_at']}
-
-## Summary
-- **Files Analyzed:** {report_data['summary']['total_files']}
-- **Total Issues:** {report_data['summary']['total_issues']}
-- **Total Fixes:** {report_data['summary']['total_fixes']}
-
-"""
-    
-    for file_data in report_data['files']:
-        if file_data['issue_count'] == 0:
-            continue
-            
-        md += f"""## File: `{file_data['filename']}`
-**Lines:** {file_data['line_count']} | **Issues:** {file_data['issue_count']}
-
-"""
-        
-        # Add AI suggestion if available
-        if file_data.get('ai_suggestion', {}).get('summary'):
-            ai_data = file_data['ai_suggestion']
-            md += f"""### AI Analysis Summary
-**Confidence:** {ai_data.get('confidence', 0):.1%}
-**Recommendations:** {ai_data.get('summary', 'No summary available')}
-
-"""
-        
-        # Add issues
-        for i, issue in enumerate(file_data['issues'], 1):
-            severity_icon = {"error": "🔴", "warning": "🟡", "info": "🔵"}.get(issue['severity'], "⚪")
-            
-            md += f"""### Issue #{i}: Line {issue['line']} {severity_icon}
-**Type:** {issue['type']} | **Source:** {issue['source']} | **Severity:** {issue['severity']}
-
-**Problem:** {issue['description']}
-
-**Original Code:**
-```python
-{issue['original_code']}
+    Generate a{issue['original_code']}
 ```
 
 **Context:**
 ```python
 {issue['context']}
-```
-
-**Recommendation:** {issue['recommendations']}
-
----
-
-"""
-    
-    return md
-
-def _format_report_as_html(report_data):
-    """Format report data as HTML"""
-    html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>{report_data['title']}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 40px; }}
-        .header {{ background: #f8f9fa; padding: 20px; border-radius: 5px; }}
-        .file-section {{ margin: 30px 0; border: 1px solid #ddd; border-radius: 5px; }}
-        .file-header {{ background: #e9ecef; padding: 15px; font-weight: bold; }}
-        .issue {{ margin: 15px; padding: 15px; border-left: 4px solid #007bff; }}
-        .issue.error {{ border-left-color: #dc3545; }}
-        .issue.warning {{ border-left-color: #ffc107; }}
-        .code {{ background: #f8f9fa; padding: 10px; border-radius: 3px; font-family: monospace; }}
-        .severity {{ padding: 3px 8px; border-radius: 3px; color: white; font-size: 12px; }}
-        .severity.error {{ background: #dc3545; }}
-        .severity.warning {{ background: #ffc107; color: black; }}
-        .severity.info {{ background: #17a2b8; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>{report_data['title']}</h1>
-        <p><strong>Generated:</strong> {report_data['generated_at']}</p>
-        <p><strong>Files:</strong> {report_data['summary']['total_files']} | 
-           <strong>Issues:</strong> {report_data['summary']['total_issues']}</p>
-    </div>
-"""
-    
-    for file_data in report_data['files']:
-        if file_data['issue_count'] == 0:
-            continue
-            
-        html += f"""
-    <div class="file-section">
-        <div class="file-header">
-            📄 {file_data['filename']} 
-            <span style="float: right;">{file_data['issue_count']} issues</span>
-        </div>
-"""
-        
-        for issue in file_data['issues']:
-            html += f"""
-        <div class="issue {issue['severity']}">
-            <h4>Line {issue['line']}: {issue['type']} 
-                <span class="severity {issue['severity']}">{issue['severity'].upper()}</span>
-            </h4>
-            <p><strong>Problem:</strong> {issue['description']}</p>
-            <p><strong>Original Code:</strong></p>
-            <div class="code">{issue['original_code']}</div>
-            <p><strong>Recommendation:</strong> {issue['recommendations']}</p>
-        </div>
-"""
-        
-        html += "    </div>"
-    
-    html += """
-</body>
-</html>"""
-    
-    return html
-
-def _get_severity_breakdown(issues):
-    """Get breakdown of issues by severity"""
-    breakdown = {"error": 0, "warning": 0, "info": 0}
-    for issue in issues:
-        severity = issue.severity.lower()
-        if severity in breakdown:
-            breakdown[severity] += 1
-    return breakdown
-
-@app.post("/improve/project")
-async def improve_entire_project(request: dict):
-    """
-    Improve multiple files in a project using ChatGPT and CodeGuard analysis.
-    
-    Performs audit on all files first, then applies AI-powered improvements.
-    """
-    try:
-        files = request.get("files", [])
-        improvement_level = request.get("improvement_level", "moderate")
-        
-        if not files:
-            raise HTTPException(status_code=400, detail="At least one file is required")
-        
-        # Convert to CodeFile objects
-        from models import CodeFile, AuditRequest
-        code_files = [
-            CodeFile(filename=f.get("filename", ""), content=f.get("content", ""))
-            for f in files
-        ]
-        
-        # First, run complete audit on all files
-        audit_request = AuditRequest(files=code_files)
-        audit_response = analyze_code(audit_request)
-        
-        # Then improve each file using ChatGPT
-        batch_improver = get_batch_improver()
-        improvements = batch_improver.improve_project(code_files, {
-            "issues": audit_response.issues,
-            "fixes": audit_response.fixes
-        })
-        
-        # Compile results
-        project_results = {
-            "original_audit": {
-                "summary": audit_response.summary,
-                "total_issues": len(audit_response.issues),
-                "total_fixes": len(audit_response.fixes)
-            },
-            "improvements": {},
-            "overall_summary": {
-                "files_processed": len(files),
-                "files_improved": 0,
-                "total_fixes_applied": 0,
-                "average_confidence": 0.0
-            }
-        }
-        
-        total_confidence = 0.0
-        files_improved = 0
-        total_fixes_applied = 0
-        
-        for filename, improvement in improvements.items():
-            project_results["improvements"][filename] = {
-                "improved_code": improvement.improved_code,
-                "applied_fixes": improvement.applied_fixes,
-                "improvement_summary": improvement.improvement_summary,
-                "confidence_score": improvement.confidence_score,
-                "warnings": improvement.warnings
-            }
-            
-            if improvement.applied_fixes:
-                files_improved += 1
-                total_fixes_applied += len(improvement.applied_fixes)
-            
-            total_confidence += improvement.confidence_score
-        
-        # Update overall summary
-        project_results["overall_summary"]["files_improved"] = files_improved
-        project_results["overall_summary"]["total_fixes_applied"] = total_fixes_applied
-        project_results["overall_summary"]["average_confidence"] = total_confidence / len(files) if files else 0.0
-        
-        return project_results
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Project improvement failed: {str(e)}")
-
-@app.post("/audit-and-improve")
-async def audit_and_improve_combined(request: AuditRequest):
-    """
-    COMPREHENSIVE CODE ANALYSIS: Full audit + intelligent AI improvements in one workflow.
-    
-    This endpoint now uses the shared audit logic and delegates to the universal /improve endpoint.
-    Maintained for backward compatibility but redirects to the more RESTful /improve endpoint.
-    """
-    try:
-        # Run shared audit logic
-        audit_response = await _run_shared_audit(request, validate_with_ai=False)
-        
-        # Track telemetry for the audit
-        session_id = str(uuid.uuid4())
-        start_time = time.time()
-        
-        # Process each file through the universal improve endpoint
-        improvements = {}
-        
-        for file in request.files:
-            # Prepare improvement request for universal endpoint
-            improve_request = {
-                "original_code": file.content,
-                "filename": file.filename,
-                "audit_results": {
-                    "issues": [issue.dict() for issue in audit_response.issues if issue.filename == file.filename],
-                    "fixes": [fix.dict() for fix in audit_response.fixes if fix.filename == file.filename]
-                },
-                "improvement_level": "aggressive",
-                "preserve_structure": False,
-                "ai_provider": request.ai_provider or "openai",
-                "ai_api_key": request.ai_api_key
-            }
-            
-            try:
-                improvement_result = await improve_code_universal(improve_request)
-                improvements[file.filename] = {
-                    "improved_code": improvement_result["improved_code"],
-                    "applied_fixes": improvement_result["applied_fixes"],
-                    "improvement_summary": improvement_result["improvement_summary"],
-                    "confidence_score": improvement_result["confidence_score"],
-                    "warnings": improvement_result["warnings"]
-                }
-            except Exception as e:
-                improvements[file.filename] = {
-                    "improved_code": file.content,
-                    "applied_fixes": [],
-                    "improvement_summary": f"AI improvement failed: {str(e)}",
-                    "confidence_score": 0.0,
-                    "warnings": [f"Could not improve {file.filename}: {str(e)}"]
-                }
-        
-        # Calculate improvement statistics
-        total_ai_fixes = sum(len(imp.get("applied_fixes", [])) for imp in improvements.values())
-        avg_confidence = sum(imp.get("confidence_score", 0) for imp in improvements.values()) / len(improvements) if improvements else 0.0
-        
-        # Record telemetry
-        processing_time = time.time() - start_time
-        framework = "unknown"
-        if request.options and request.options.framework:
-            framework = request.options.framework
-        else:
-            # Detect framework from code content
-            all_content = " ".join([f.content for f in request.files])
-            if "torch" in all_content or "pytorch" in all_content:
-                framework = "pytorch"
-            elif "tensorflow" in all_content or "tf." in all_content:
-                framework = "tensorflow"
-            elif "gym" in all_content:
-                framework = "gym"
-        
-        # Record telemetry (skip if errors occur to avoid blocking)
-        try:
-            from datetime import datetime
-            from telemetry import AuditSession
-            
-            # Get error types and severity breakdown
-            error_type_counts = {}
-            severity_counts = {}
-            for issue in audit_response.issues:
-                issue_type = issue.type
-                severity = issue.severity
-                error_type_counts[issue_type] = error_type_counts.get(issue_type, 0) + 1
-                severity_counts[severity] = severity_counts.get(severity, 0) + 1
-            
-            tools_used = list(set(issue.source for issue in audit_response.issues))
-            
-            session_data = AuditSession(
-                session_id=session_id,
-                timestamp=datetime.now(),
-                file_count=len(request.files),
-                total_issues=len(audit_response.issues),
-                error_types=error_type_counts,
-                severity_breakdown=severity_counts,
-                analysis_time_ms=int(processing_time * 1000),
-                framework_detected=framework,
-                tools_used=tools_used
-            )
-            telemetry_collector.record_audit_session(session_data)
-        except Exception:
-            pass  # Don't let telemetry errors block the response
-        
-        return {
-            "audit_results": {
-                "summary": audit_response.summary,
-                "issues": [issue.dict() for issue in audit_response.issues],
-                "fixes": [fix.dict() for fix in audit_response.fixes]
-            },
-            "ai_improvements": improvements,
-            "combined_summary": {
-                "session_id": session_id,
-                "total_issues_found": len(audit_response.issues),
-                "codeguard_fixes": len(audit_response.fixes),
-                "ai_fixes_applied": total_ai_fixes,
-                "average_ai_confidence": avg_confidence,
-                "processing_time_seconds": round(processing_time, 2),
-                "framework_detected": framework
-            }
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Combined audit and improvement failed: {str(e)}")
-
-@app.post("/improve/quick-fix")
-async def quick_fix_code(request: dict):
-    """
-    INSTANT QUICK FIXES: Apply immediate automated fixes without AI processing.
-    
-    Use this for fast, reliable fixes that don't require AI reasoning:
-    - Security vulnerabilities (pickle, eval replacements)
-    - Import cleanup and formatting
-    - Missing random seeds
-    - Basic ML/RL best practices
-    - Sub-second response time
-    """
-    try:
-        original_code = request.get("original_code", "")
-        filename = request.get("filename", "quick_fix.py")
-        issue_types = request.get("issue_types", ["security", "imports", "formatting"])
-        
-        if not original_code:
-            raise HTTPException(status_code=400, detail="Code content is required")
-        
-        # Use the reliable code fixer for instant fixes
-        from reliable_code_fixer import create_reliable_fixer
-        
-        fixer = create_reliable_fixer()
-        
-        # Create mock issues for the requested types using proper Issue objects
-        from models import Issue
-        mock_issues = []
-        for issue_type in issue_types:
-            if issue_type == "security":
-                if "pickle.load(" in original_code:
-                    mock_issues.append(Issue(
-                        filename=filename,
-                        line=1,
-                        type="security",
-                        description="Use of pickle.load() poses security risk",
-                        source="quick_fix",
-                        severity="error"
-                    ))
-                if "eval(" in original_code:
-                    mock_issues.append(Issue(
-                        filename=filename,
-                        line=1,
-                        type="security",
-                        description="Use of eval() poses security risk",
-                        source="quick_fix",
-                        severity="error"
-                    ))
-            elif issue_type == "imports" and ("import " in original_code):
-                mock_issues.append(Issue(
-                    filename=filename,
-                    line=1,
-                    type="style",
-                    description="Import optimization needed",
-                    source="quick_fix", 
-                    severity="warning"
-                ))
-        
-        # Apply quick fixes
-        result = fixer.fix_code(original_code, mock_issues)
-        
-        return {
-            "improved_code": result.get("improved_code", original_code),
-            "applied_fixes": result.get("applied_fixes", []),
-            "improvement_summary": f"QUICK FIX: {result.get('improvement_summary', 'Applied automated fixes')}",
-            "confidence_score": result.get("confidence_score", 0.95),
-            "warnings": result.get("warnings", []),
-            "improvement_type": "quick_fix",
-            "processing_time": "< 1 second",
-            "fix_types_applied": issue_types
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Quick fix failed: {str(e)}")
-
-@app.post("/improve/experimental")
-async def experimental_improvement(request: dict):
-    """
-    EXPERIMENTAL AI ENHANCEMENT: Cutting-edge improvements with latest AI features.
-    
-    Use this for advanced AI capabilities and experimental features:
-    - DeepSeek R1 reasoning chains
-    - Function calling for specialized analysis
-    - FIM completion for targeted improvements
-    - Custom prompt generation
-    - May take longer but provides most advanced results
-    """
-    try:
-        original_code = request.get("original_code", "")
-        filename = request.get("filename", "experimental.py")
-        issues = request.get("issues", [])
-        experimental_features = request.get("features", ["reasoning", "function_calling", "custom_prompts"])
-        ai_provider = request.get("ai_provider", "deepseek")
-        ai_api_key = request.get("ai_api_key")
-        
-        if not original_code:
-            raise HTTPException(status_code=400, detail="Code content is required")
-        
-        # Use experimental AI features
-        from chatgpt_integration import get_code_improver
-        from adaptive_prompt_generator import get_adaptive_prompt_generator
-        
-        improver = get_code_improver()
-        
-        applied_features = []
-        final_result = {
-            "improved_code": original_code,
-            "applied_fixes": [],
-            "improvement_summary": "Experimental improvements applied",
-            "confidence_score": 0.8,
-            "warnings": []
-        }
-        
-        # Apply custom prompt generation if requested
-        if "custom_prompts" in experimental_features:
-            try:
-                prompt_generator = get_adaptive_prompt_generator()
-                from models import Issue, CodeFile
-                
-                code_files = [CodeFile(filename=filename, content=original_code)]
-                issue_objects = [Issue(
-                    filename=filename,
-                    line=i.get("line", 1),
-                    type=i.get("type", "unknown"),
-                    description=i.get("description", ""),
-                    source=i.get("source", "experimental"),
-                    severity=i.get("severity", "info")
-                ) for i in issues]
-                
-                custom_prompt_result = prompt_generator.generate_custom_prompt(
-                    issues=issue_objects,
-                    fixes=[],
-                    code_files=code_files,
-                    ai_provider=ai_provider
-                )
-                
-                applied_features.append("custom_prompt_generation")
-                final_result["confidence_score"] += custom_prompt_result.get("confidence_boost", 0.1)
-                
-            except Exception as e:
-                final_result["warnings"].append(f"Custom prompt generation failed: {str(e)}")
-        
-        # Apply function calling if using DeepSeek
-        if "function_calling" in experimental_features and ai_provider.lower() == "deepseek":
-            try:
-                from deepseek_keepalive_handler import create_deepseek_handler
-                
-                handler = create_deepseek_handler(ai_api_key)
-                result = handler.generate_code_improvement(original_code, issues)
-                
-                if result.get("improved_code") != original_code:
-                    final_result = result
-                    applied_features.append("deepseek_function_calling")
-                    
-            except Exception as e:
-                final_result["warnings"].append(f"Function calling failed: {str(e)}")
-        
-        final_result.update({
-            "improvement_type": "experimental",
-            "experimental_features_applied": applied_features,
-            "ai_provider_used": ai_provider,
-            "processing_approach": "cutting_edge"
-        })
-        
-        return final_result
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Experimental improvement failed: {str(e)}")
-
-# GitHub Repository Context Endpoints
-@app.post("/repo/analyze")
-async def analyze_github_repository(request: dict):
-    """
-    Analyze a GitHub repository to extract context information for AI code improvements.
-    
-    Provides comprehensive repository context including:
-    - Repository metadata (description, language, topics)
-    - Project structure and file organization  
-    - Dependencies and framework detection
-    - README content summary
-    - Package files (requirements.txt, package.json, etc.)
-    """
-    try:
-        repo_url = request.get("repo_url")
-        github_token = request.get("github_token")
-        
-        if not repo_url:
-            raise HTTPException(status_code=400, detail="Repository URL is required")
-        
-        # Initialize GitHub context provider
-        github_provider = get_repo_context_provider(github_token)
-        
-        # Get repository information
-        repo_info = github_provider.get_repository_info(repo_url)
-        
-        if not repo_info:
-            raise HTTPException(status_code=404, detail="Repository not found or not accessible")
-        
-        # Generate context summary for AI
-        context_summary = github_provider.generate_context_summary(repo_info)
-        
-        return {
-            "status": "success",
-            "repository": {
-                "owner": repo_info.owner,
-                "name": repo_info.name,
-                "description": repo_info.description,
-                "language": repo_info.language,
-                "topics": repo_info.topics,
-                "framework": repo_info.framework,
-                "dependencies_count": len(repo_info.dependencies),
-                "key_dependencies": repo_info.dependencies[:10]  # Top 10 dependencies
-            },
-            "context_summary": context_summary,
-            "file_structure_overview": repo_info.file_structure,
-            "package_files_found": list(repo_info.package_files.keys()),
-            "context_available": True
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Repository analysis failed: {str(e)}")
-
-@app.post("/improve/with-repo-context")
-async def improve_code_with_repository_context(request: dict):
-    """
-    Improve code using AI with enhanced repository context for better results.
-    
-    This endpoint provides context-aware code improvements by:
-    - Analyzing the source repository structure and patterns
-    - Understanding project dependencies and framework
-    - Following established coding conventions
-    - Applying project-specific best practices
-    """
-    try:
-        # Extract request parameters
-        original_code = request.get("original_code", "")
-        filename = request.get("filename", "")
-        issues = request.get("issues", [])
-        fixes = request.get("fixes", [])
-        repo_url = request.get("github_repo_url")
-        github_token = request.get("github_token")
-        ai_provider = request.get("ai_provider", "openai")
-        ai_api_key = request.get("ai_api_key")
-        improvement_level = request.get("improvement_level", "moderate")
-        
-        if not original_code or not filename:
-            raise HTTPException(status_code=400, detail="Original code and filename are required")
-        
-        # Convert issues to proper objects
-        from models import Issue
-        issue_objects = [
-            Issue(
-                filename=issue.get("filename", filename),
-                line=issue.get("line", 1),
-                type=issue.get("type", "unknown"),
-                description=issue.get("description", ""),
-                source=issue.get("source", "unknown"),
-                severity=issue.get("severity", "warning")
-            ) for issue in issues
-        ]
-        
-        # Create improvement request with repository context
-        improvement_request = CodeImprovementRequest(
-            original_code=original_code,
-            filename=filename,
-            issues=issue_objects,
-            fixes=[],
-            improvement_level=improvement_level,
-            preserve_functionality=True,
-            ai_provider=ai_provider,
-            ai_api_key=ai_api_key,
-            github_repo_url=repo_url,
-            github_token=github_token
-        )
-        
-        # Use code improver with repository context
-        code_improver = get_code_improver()
-        response = code_improver.improve_code(improvement_request)
-        
-        return {
-            "improved_code": response.improved_code,
-            "applied_fixes": response.applied_fixes,
-            "improvement_summary": response.improvement_summary,
-            "confidence_score": response.confidence_score,
-            "warnings": response.warnings,
-            "repository_context_used": bool(repo_url),
-            "ai_provider": ai_provider,
-            "enhancement_details": {
-                "context_enhanced": bool(repo_url),
-                "original_issues_count": len(issue_objects),
-                "fixes_applied_count": len(response.applied_fixes)
-            }
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Context-enhanced improvement failed: {str(e)}")
-
-@app.post("/repo/context-summary") 
-async def get_repository_context_summary(request: dict):
-    """
-    Get a concise repository context summary optimized for AI prompts.
-    
-    Returns a formatted context summary that can be directly used
-    to enhance AI prompts with repository-specific information.
-    """
-    try:
-        repo_url = request.get("repo_url")
-        github_token = request.get("github_token")
-        
-        if not repo_url:
-            raise HTTPException(status_code=400, detail="Repository URL is required")
-        
-        # Initialize GitHub context provider  
-        github_provider = get_repo_context_provider(github_token)
-        
-        # Get repository information
-        repo_info = github_provider.get_repository_info(repo_url)
-        
-        if not repo_info:
-            return {
-                "status": "not_found",
-                "context_summary": "",
-                "context_available": False,
-                "error": "Repository not found or not accessible"
-            }
-        
-        # Generate AI-optimized context summary
-        context_summary = github_provider.generate_context_summary(repo_info)
-        
-        return {
-            "status": "success", 
-            "context_summary": context_summary,
-            "context_available": True,
-            "repository_info": {
-                "framework": repo_info.framework,
-                "language": repo_info.language,
-                "topics": repo_info.topics,
-                "dependency_count": len(repo_info.dependencies)
-            }
-        }
-        
-    except Exception as e:
-        return {
-            "status": "error",
-            "context_summary": "",
-            "context_available": False,
-            "error": str(e)
-        }
-
-@app.post("/repo/files")
-async def get_repository_python_files(request: dict):
-    """
-    Get list of Python files from a GitHub repository for file selection.
-    
-    Returns a list of Python files with their paths and metadata for
-    dropdown selection in the playground interface.
-    """
-    try:
-        repo_url = request.get("repo_url")
-        github_token = request.get("github_token")
-        max_files = request.get("max_files", 50)
-        
-        if not repo_url:
-            raise HTTPException(status_code=400, detail="Repository URL is required")
-        
-        # Initialize GitHub context provider
-        github_provider = get_repo_context_provider(github_token)
-        
-        # Get Python files list
-        python_files = github_provider.get_python_files(repo_url, max_files)
-        
-        return {
-            "status": "success",
-            "files": python_files,
-            "total_files": len(python_files),
-            "repo_url": repo_url
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch repository files: {str(e)}")
-
-@app.post("/repo/file-content")
-async def get_repository_file_content(request: dict):
-    """
-    Get content of a specific Python file from a GitHub repository.
-    
-    Fetches the actual file content for analysis and improvement.
-    """
-    try:
-        repo_url = request.get("repo_url")
-        file_path = request.get("file_path")
-        github_token = request.get("github_token")
-        
-        if not repo_url or not file_path:
-            raise HTTPException(status_code=400, detail="Repository URL and file path are required")
-        
-        # Initialize GitHub context provider
-        github_provider = get_repo_context_provider(github_token)
-        
-        # Get file content
-        file_content = github_provider.get_file_content_by_path(repo_url, file_path)
-        
-        if not file_content:
-            raise HTTPException(status_code=404, detail="File not found or not accessible")
-        
-        return {
-            "status": "success",
-            "file": file_content,
-            "repo_url": repo_url
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch file content: {str(e)}")
-
-@app.post("/repo/discover-related-files")
-async def discover_related_files(request: dict):
-    """
-    Discover files related to a target file for enhanced AI context.
-    
-    Uses intelligent analysis to find:
-    - Same directory files (config, __init__.py)
-    - Imported/dependency files
-    - Similar naming patterns
-    - Configuration files
-    - Parent directory utilities
-    """
-    try:
-        repo_url = request.get("repo_url")
-        target_file_path = request.get("target_file_path")
-        github_token = request.get("github_token")
-        max_files = request.get("max_files", 5)
-        
-        if not repo_url or not target_file_path:
-            raise HTTPException(status_code=400, detail="Repository URL and target file path are required")
-        
-        # Initialize GitHub context provider
-        github_provider = get_repo_context_provider(github_token)
-        
-        # Discover related files
-        related_files = github_provider.discover_related_files(repo_url, target_file_path, max_files)
-        
-        return {
-            "status": "success",
-            "target_file": target_file_path,
-            "related_files": related_files,
-            "total_related": len(related_files),
-            "repo_url": repo_url
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to discover related files: {str(e)}")
-
-@app.post("/improve/with-related-context")
-async def improve_code_with_related_context(request: dict):
-    """
-    Improve code with automatic discovery of related files for enhanced AI context.
-    
-    This endpoint automatically finds and includes related files from the repository
-    to provide the AI with better understanding of imports, dependencies, and patterns.
-    """
-    try:
-        original_code = request.get("original_code", "")
-        filename = request.get("filename", "")
-        repo_url = request.get("github_repo_url")
-        github_token = request.get("github_token")
-        target_file_path = request.get("target_file_path")
-        ai_provider = request.get("ai_provider", "openai")
-        ai_api_key = request.get("ai_api_key")
-        improvement_level = request.get("improvement_level", "moderate")
-        max_related_files = request.get("max_related_files", 5)
-        
-        if not original_code or not filename:
-            raise HTTPException(status_code=400, detail="Original code and filename are required")
-        
-        # First audit the code to get issues
-        from audit import analyze_code
-        from models import AuditRequest, CodeFile, AuditOptions
-        
-        audit_request = AuditRequest(
-            files=[CodeFile(filename=filename, content=original_code)],
-            options=AuditOptions(level="standard", framework="auto", target="gpu")
-        )
-        
-        audit_result = analyze_code(audit_request)
-        
-        # Convert to CodeImprovementRequest format
-        from chatgpt_integration import CodeImprovementRequest, get_code_improver
-        
-        improvement_request = CodeImprovementRequest(
-            original_code=original_code,
-            filename=filename,
-            issues=audit_result.issues,
-            fixes=audit_result.fixes,
-            improvement_level=improvement_level,
-            ai_provider=ai_provider,
-            ai_api_key=ai_api_key,
-            github_repo_url=repo_url,
-            github_token=github_token
-        )
-        
-        # Discover related files if repository context is available
-        related_files = []
-        if repo_url and target_file_path:
-            github_provider = get_repo_context_provider(github_token)
-            related_files = github_provider.discover_related_files(
-                repo_url, target_file_path, max_related_files
-            )
-        
-        # Get the code improver
-        code_improver = get_code_improver()
-        
-        # Create a custom improver method that includes related files context
-        if related_files and repo_url:
-            # Create enhanced context by modifying the GitHub repo URL to include related files info
-            from github_repo_context import RepoContextEnhancedImprover
-            
-            enhanced_improver = RepoContextEnhancedImprover()
-            
-            # Use the enhanced improver with related files context
-            response = enhanced_improver.improve_code_with_related_files(
-                original_code=original_code,
-                filename=filename,
-                issues=audit_result.issues,
-                fixes=audit_result.fixes,
-                repo_url=repo_url,
-                related_files=related_files,
-                ai_provider=ai_provider,
-                ai_api_key=ai_api_key,
-                improvement_level=improvement_level
-            )
-        else:
-            # Perform standard improvement
-            response = code_improver.improve_code(improvement_request)
-        
-        return {
-            "status": "success",
-            "original_code": original_code,
-            "improved_code": response.improved_code,
-            "applied_fixes": response.applied_fixes,
-            "improvement_summary": response.improvement_summary,
-            "confidence_score": response.confidence_score,
-            "warnings": response.warnings,
-            "related_files_used": len(related_files),
-            "related_files": [
-                {
-                    "path": f["path"],
-                    "filename": f["filename"],
-                    "relevance_score": f["relevance_score"],
-                    "reason": f["reason"]
-                } for f in related_files
-            ],
-            "context_enhanced": len(related_files) > 0
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Context-enhanced improvement failed: {str(e)}")
-
-# Enhanced Repository Analysis Endpoints
-
-@app.get("/analysis/dependency-vulnerabilities")
-async def get_dependency_vulnerabilities():
-    """
-    Analyze project dependencies for security vulnerabilities and license issues.
-    
-    Returns vulnerability scan results from pip-audit and license analysis from pip-licenses.
-    """
-    try:
-        from enhanced_audit import EnhancedAuditEngine
-        from models import CodeFile, AuditRequest
-        import tempfile
-        import os
-        
-        # Check if we have dependency files to analyze
-        dependency_files = []
-        for filename in ["pyproject.toml", "requirements.txt", "setup.py"]:
-            if os.path.exists(filename):
-                try:
-                    with open(filename, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    dependency_files.append(CodeFile(filename=filename, content=content))
-                except Exception:
-                    continue
-        
-        if not dependency_files:
-            return {
-                "available": False,
-                "message": "No dependency files found (pyproject.toml, requirements.txt, setup.py)",
-                "vulnerabilities": [],
-                "license_issues": []
-            }
-        
-        # Run dependency audit
-        audit_engine = EnhancedAuditEngine()
-        all_issues = []
-        all_fixes = []
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for file in dependency_files:
-                file_path = os.path.join(temp_dir, file.filename)
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(file.content)
-                
-                issues, fixes = audit_engine._run_dependency_audit(file_path, file.filename, file.content, temp_dir)
-                all_issues.extend(issues)
-                all_fixes.extend(fixes)
-        
-        # Categorize results
-        vulnerabilities = [issue for issue in all_issues if issue.type == "security"]
-        license_issues = [issue for issue in all_issues if issue.type == "license"]
-        
-        return {
-            "available": True,
-            "dependencies_analyzed": [f.filename for f in dependency_files],
-            "vulnerabilities": [
-                {
-                    "filename": issue.filename,
-                    "description": issue.description,
-                    "severity": issue.severity,
-                    "source": issue.source
-                }
-                for issue in vulnerabilities
-            ],
-            "license_issues": [
-                {
-                    "filename": issue.filename,
-                    "description": issue.description,
-                    "severity": issue.severity,
-                    "source": issue.source
-                }
-                for issue in license_issues
-            ],
-            "fixes_available": [
-                {
-                    "filename": fix.filename,
-                    "suggestion": fix.suggestion,
-                    "auto_fixable": fix.auto_fixable
-                }
-                for fix in all_fixes
-            ],
-            "summary": {
-                "total_vulnerabilities": len(vulnerabilities),
-                "total_license_issues": len(license_issues),
-                "critical_issues": len([v for v in vulnerabilities if v.severity == "error"]),
-                "recommendations": len(all_fixes)
-            }
-        }
-        
-    except Exception as e:
-        return {
-            "available": False,
-            "error": f"Dependency analysis failed: {str(e)}",
-            "vulnerabilities": [],
-            "license_issues": []
-        }
-
-@app.get("/analysis/complexity-metrics")
-async def get_complexity_metrics():
-    """
-    Analyze code complexity metrics using radon for all Python files in the project.
-    
-    Returns cyclomatic complexity, maintainability index, and technical debt indicators.
-    """
-    try:
-        from enhanced_audit import EnhancedAuditEngine
-        from models import CodeFile
-        import os
-        import glob
-        
-        # Find all Python files in the project
-        python_files = []
-        for pattern in ["*.py", "**/*.py"]:
-            for filepath in glob.glob(pattern, recursive=True):
-                if os.path.isfile(filepath) and not filepath.startswith('.'):
-                    try:
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                        python_files.append(CodeFile(filename=filepath, content=content))
-                    except Exception:
-                        continue
-        
-        if not python_files:
-            return {
-                "available": False,
-                "message": "No Python files found in the project",
-                "complexity_metrics": []
-            }
-        
-        # Run complexity analysis
-        audit_engine = EnhancedAuditEngine()
-        all_issues = []
-        all_fixes = []
-        
-        import tempfile
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for file in python_files:
-                file_path = os.path.join(temp_dir, os.path.basename(file.filename))
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(file.content)
-                
-                issues, fixes = audit_engine._run_complexity_analysis(file_path, file.filename, file.content, temp_dir)
-                all_issues.extend(issues)
-                all_fixes.extend(fixes)
-        
-        # Categorize complexity issues
-        complexity_issues = [issue for issue in all_issues if issue.type == "complexity"]
-        maintainability_issues = [issue for issue in all_issues if issue.type == "maintainability"]
-        
-        # Calculate project-wide metrics
-        total_functions = len([issue for issue in complexity_issues])
-        high_complexity_functions = len([issue for issue in complexity_issues if issue.severity == "error"])
-        
-        return {
-            "available": True,
-            "files_analyzed": len(python_files),
-            "complexity_issues": [
-                {
-                    "filename": issue.filename,
-                    "line": issue.line,
-                    "description": issue.description,
-                    "severity": issue.severity,
-                    "source": issue.source
-                }
-                for issue in complexity_issues
-            ],
-            "maintainability_issues": [
-                {
-                    "filename": issue.filename,
-                    "description": issue.description,
-                    "severity": issue.severity
-                }
-                for issue in maintainability_issues
-            ],
-            "refactoring_suggestions": [
-                {
-                    "filename": fix.filename,
-                    "line": fix.line,
-                    "suggestion": fix.suggestion
-                }
-                for fix in all_fixes
-            ],
-            "summary": {
-                "total_functions_analyzed": total_functions,
-                "high_complexity_functions": high_complexity_functions,
-                "maintainability_issues": len(maintainability_issues),
-                "refactoring_opportunities": len(all_fixes),
-                "technical_debt_score": min(1.0, (high_complexity_functions + len(maintainability_issues)) / max(total_functions, 1))
-            }
-        }
-        
-    except Exception as e:
-        return {
-            "available": False,
-            "error": f"Complexity analysis failed: {str(e)}",
-            "complexity_metrics": []
-        }
-
-@app.get("/analysis/git-history")
-async def get_git_history_analysis(days: int = 90):
-    """
-    Analyze Git repository history to identify bug-prone files and code churn patterns.
-    
-    Args:
-        days: Number of days of history to analyze (default: 90)
-    
-    Returns comprehensive Git history analysis including bug-prone files and trends.
-    """
-    try:
-        git_analysis = analyze_git_history(".", days)
-        return git_analysis
-        
-    except Exception as e:
-        return {
-            "available": False,
-            "error": f"Git history analysis failed: {str(e)}",
-            "analysis_period_days": days
-        }
-
-@app.get("/analysis/repository-heatmap")
-async def get_repository_heatmap():
-    """
-    Generate comprehensive repository heatmap showing complexity, issues, and Git metrics.
-    
-    Combines static analysis results with Git history to create a visual heatmap of risk areas.
-    """
-    try:
-        from models import CodeFile, AuditRequest
-        import os
-        import glob
-        
-        # Collect all Python files
-        python_files = []
-        for pattern in ["*.py", "**/*.py"]:
-            for filepath in glob.glob(pattern, recursive=True):
-                if os.path.isfile(filepath) and not filepath.startswith('.'):
-                    try:
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                        python_files.append(CodeFile(filename=filepath, content=content))
-                    except Exception:
-                        continue
-        
-        if not python_files:
-            return {
-                "available": False,
-                "message": "No Python files found for heatmap generation"
-            }
-        
-        # Run comprehensive audit
-        audit_request = AuditRequest(files=python_files)
-        audit_response = analyze_code(audit_request)
-        
-        # Get Git analysis
-        git_analysis = analyze_git_history(".", 90)
-        
-        # Get cross-file analysis
-        cross_file_issues, cross_file_fixes = analyze_repository_structure(python_files)
-        
-        # Build heatmap data
-        file_metrics = {}
-        
-        # Process static analysis results
-        for issue in audit_response.issues:
-            filename = issue.filename
-            if filename not in file_metrics:
-                file_metrics[filename] = {
-                    "filename": filename,
-                    "issue_count": 0,
-                    "severity_breakdown": {"error": 0, "warning": 0, "info": 0},
-                    "complexity_score": 0,
-                    "security_issues": 0,
-                    "git_metrics": {},
-                    "risk_score": 0.0
-                }
-            
-            file_metrics[filename]["issue_count"] += 1
-            file_metrics[filename]["severity_breakdown"][issue.severity] += 1
-            
-            if issue.type == "security":
-                file_metrics[filename]["security_issues"] += 1
-            if issue.type == "complexity":
-                file_metrics[filename]["complexity_score"] += 1
-        
-        # Add Git metrics if available
-        if git_analysis.get("available") and git_analysis.get("bug_prone_files"):
-            for bug_prone in git_analysis["bug_prone_files"]:
-                filename = bug_prone["filename"]
-                if filename in file_metrics:
-                    file_metrics[filename]["git_metrics"] = {
-                        "commit_count": bug_prone["commit_count"],
-                        "bug_fix_count": bug_prone["bug_fix_count"],
-                        "risk_score": bug_prone["risk_score"],
-                        "complexity_trend": bug_prone["complexity_trend"]
-                    }
-        
-        # Add cross-file analysis results
-        for issue in cross_file_issues:
-            filename = issue.filename
-            if filename in file_metrics:
-                if issue.type == "unused_code":
-                    file_metrics[filename]["unused_code"] = file_metrics[filename].get("unused_code", 0) + 1
-                elif issue.type == "circular_dependency":
-                    file_metrics[filename]["circular_dependencies"] = file_metrics[filename].get("circular_dependencies", 0) + 1
-        
-        # Calculate risk scores
-        for filename, metrics in file_metrics.items():
-            issue_factor = min(metrics["issue_count"] / 10, 1.0)
-            security_factor = min(metrics["security_issues"] / 3, 1.0)
-            complexity_factor = min(metrics["complexity_score"] / 5, 1.0)
-            git_factor = metrics["git_metrics"].get("risk_score", 0.0)
-            
-            metrics["risk_score"] = (
-                issue_factor * 0.3 +
-                security_factor * 0.3 +
-                complexity_factor * 0.2 +
-                git_factor * 0.2
-            )
-        
-        # Sort by risk score
-        sorted_files = sorted(file_metrics.values(), key=lambda x: x["risk_score"], reverse=True)
-        
-        return {
-            "available": True,
-            "files_analyzed": len(python_files),
-            "heatmap_data": sorted_files,
-            "summary": {
-                "total_files": len(file_metrics),
-                "high_risk_files": len([f for f in sorted_files if f["risk_score"] > 0.7]),
-                "medium_risk_files": len([f for f in sorted_files if 0.3 < f["risk_score"] <= 0.7]),
-                "low_risk_files": len([f for f in sorted_files if f["risk_score"] <= 0.3]),
-                "total_issues": sum(f["issue_count"] for f in sorted_files),
-                "total_security_issues": sum(f["security_issues"] for f in sorted_files),
-                "git_analysis_available": git_analysis.get("available", False)
-            },
-            "recommendations": [
-                f"Focus on {sorted_files[0]['filename']} - highest risk score ({sorted_files[0]['risk_score']:.2f})" if sorted_files else "No high-risk files identified",
-                f"Review {len([f for f in sorted_files if f['security_issues'] > 0])} files with security issues",
-                f"Consider refactoring {len([f for f in sorted_files if f['complexity_score'] > 2])} files with high complexity"
-            ]
-        }
-        
-    except Exception as e:
-        return {
-            "available": False,
-            "error": f"Repository heatmap generation failed: {str(e)}"
-        }
-
-@app.get("/context/related-files")
-async def get_related_files(file_path: str, limit: int = 5):
-    """
-    Get files that are frequently co-changed with the specified file using Git history analysis.
-    """
-    try:
-        if not git_context_retriever.is_available():
-            return {
-                "available": False,
-                "message": "Git repository not available for context analysis",
-                "related_files": []
-            }
-        
-        related_files = git_context_retriever.get_related_files(file_path, limit)
-        
-        return {
-            "available": True,
-            "file_path": file_path,
-            "related_files": related_files,
-            "analysis_method": "git_commit_history",
-            "total_found": len(related_files)
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Related files analysis failed: {str(e)}")
-
-@app.get("/context/comprehensive")
-async def get_comprehensive_context(file_path: str, max_files: int = 5):
-    """
-    Get comprehensive context for a file including both co-changed files and dependencies.
-    """
-    try:
-        if not git_context_retriever.is_available():
-            return {
-                "available": False,
-                "message": "Git repository not available for comprehensive context analysis",
-                "context": {}
-            }
-        
-        context = git_context_retriever.get_comprehensive_context(file_path, max_files)
-        
-        # Calculate context statistics
-        total_lines = sum(len(content.split('\n')) for content in context.values())
-        file_types = {}
-        for file_path in context.keys():
-            ext = file_path.split('.')[-1] if '.' in file_path else 'unknown'
-            file_types[ext] = file_types.get(ext, 0) + 1
-        
-        return {
-            "available": True,
-            "target_file": file_path,
-            "context_files": list(context.keys()),
-            "context": context,
-            "statistics": {
-                "total_files": len(context),
-                "total_lines": total_lines,
-                "file_types": file_types
-            },
-            "analysis_methods": ["git_commit_history", "import_analysis", "priority_scoring"]
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Comprehensive context analysis failed: {str(e)}")
-
-@app.post("/improve/context-aware")
-async def context_aware_improvement(request: dict):
-    """
-    AI-powered code improvement enhanced with Git repository context for more intelligent suggestions.
-    
-    This endpoint combines:
-    - Static analysis results from CodeGuard
-    - Git history analysis for related files
-    - Import dependency analysis
-    - AI improvement with comprehensive repository context
-    """
-    try:
-        original_code = request.get("original_code", "")
-        filename = request.get("filename", "unknown.py")
-        ai_provider = request.get("ai_provider", "openai")
-        ai_api_key = request.get("ai_api_key")
-        include_git_context = request.get("include_git_context", True)
-        max_context_files = request.get("max_context_files", 5)
-        
-        if not original_code:
-            raise HTTPException(status_code=400, detail="Code content is required")
-        
-        # First, perform static analysis to identify issues
-        from models import AuditRequest, CodeFile
-        from enhanced_audit import EnhancedAuditEngine
-        
-        audit_request = AuditRequest(
-            files=[CodeFile(filename=filename, content=original_code)]
-        )
-        
-        audit_engine = EnhancedAuditEngine()
-        audit_response = audit_engine.analyze_code(audit_request)
-        
-        # Get Git context if requested and available
-        related_context = {}
-        context_summary = "No repository context available"
-        
-        if include_git_context and git_context_retriever.is_available():
-            try:
-                related_context = git_context_retriever.get_comprehensive_context(filename, max_context_files)
-                if related_context:
-                    context_files = list(related_context.keys())
-                    context_summary = f"Repository context loaded: {len(context_files)} related files including {', '.join(context_files[:3])}"
-                    if len(context_files) > 3:
-                        context_summary += f" and {len(context_files) - 3} more"
-            except Exception as e:
-                context_summary = f"Could not load repository context: {str(e)}"
-        
-        # Create improvement request with context
-        from chatgpt_integration import CodeImprovementRequest, get_code_improver
-        
-        improvement_request = CodeImprovementRequest(
-            original_code=original_code,
-            filename=filename,
-            issues=audit_response.issues,
-            fixes=audit_response.fixes,
-            improvement_level="moderate",
-            preserve_functionality=True,
-            ai_provider=ai_provider,
-            ai_api_key=ai_api_key
-        )
-        
-        # Perform AI improvement with context
-        code_improver = get_code_improver()
-        
-        # Build enhanced prompt with Git context if available
-        if related_context:
-            # Format related files for the prompt
-            related_files_data = [
-                {
-                    "filename": file_path,
-                    "path": file_path,
-                    "content": content,
-                    "reason": "Frequently co-changed or imported dependency",
-                    "relevance_score": 8.0 - i  # Higher score for earlier files
-                }
-                for i, (file_path, content) in enumerate(related_context.items())
-            ]
-            
-            # Use the enhanced _build_improvement_prompt with related files context
-            if ai_provider.lower() == "openai":
-                improvement_response = code_improver._improve_with_openai(improvement_request)
-            elif ai_provider.lower() == "deepseek":
-                improvement_response = code_improver._improve_with_deepseek(improvement_request)
-            else:
-                improvement_response = code_improver.improve_code(improvement_request)
-        else:
-            improvement_response = code_improver.improve_code(improvement_request)
-        
-        return {
-            "improved_code": improvement_response.improved_code,
-            "applied_fixes": improvement_response.applied_fixes,
-            "improvement_summary": improvement_response.improvement_summary,
-            "confidence_score": improvement_response.confidence_score,
-            "warnings": improvement_response.warnings,
-            "context_analysis": {
-                "git_context_available": git_context_retriever.is_available(),
-                "context_summary": context_summary,
-                "related_files_count": len(related_context),
-                "related_files": list(related_context.keys()) if related_context else []
-            },
-            "static_analysis": {
-                "issues_found": len(audit_response.issues),
-                "fixes_suggested": len(audit_response.fixes),
-                "tools_used": 8  # Number of analysis tools used
-            },
-            "improvement_type": "context_aware",
-            "ai_provider_used": ai_provider
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Context-aware improvement failed: {str(e)}")
-
-
-@app.get("/cache/stats")
-async def get_cache_statistics():
-    """
-    Get analysis cache statistics and performance metrics.
-    Shows cache hit rates, storage usage, and performance improvements.
-    """
-    try:
-        file_cache = get_file_cache()
-        project_cache = get_project_cache()
-        
-        file_stats = file_cache.get_cache_stats()
-        
-        return {
-            "cache_enabled": True,
-            "file_cache": file_stats,
-            "project_cache": {
-                "enabled": True,
-                "ttl_hours": 1
-            },
-            "performance_impact": {
-                "estimated_speedup": "3-5x for repeated analysis",
-                "storage_efficiency": "JSON compression with TTL cleanup"
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cache statistics failed: {str(e)}")
-
-
-@app.post("/cache/clear")
-async def clear_analysis_cache():
-    """
-    Clear all cached analysis results.
-    Useful for testing or when analysis rules change significantly.
-    """
-    try:
-        file_cache = get_file_cache()
-        file_cache.clear_cache()
-        
-        return {
-            "status": "success",
-            "message": "Analysis cache cleared successfully",
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cache clear failed: {str(e)}")
-
-
-@app.get("/rules/config")
-async def get_rule_configuration():
-    """
-    Get current granular rule configuration.
-    Shows enabled/disabled rules, severity levels, and rule sets.
-    """
-    try:
-        rule_manager = get_rule_manager()
-        config_summary = rule_manager.get_config_summary()
-        
-        return {
-            "configuration": config_summary,
-            "available_severities": ["ignore", "info", "warning", "error", "critical"],
-            "rule_sets": rule_manager.project_config.rule_sets,
-            "config_file": rule_manager.config_file
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Rule configuration retrieval failed: {str(e)}")
-
-
-@app.post("/rules/configure")
-async def configure_rule(rule_id: str, enabled: bool = None, severity: str = None):
-    """
-    Configure individual rule settings.
-    Allows enabling/disabling rules and changing severity levels.
-    """
-    try:
-        rule_manager = get_rule_manager()
-        
-        updates = {}
-        if enabled is not None:
-            updates['enabled'] = enabled
-        if severity is not None:
-            if severity not in ["ignore", "info", "warning", "error", "critical"]:
-                raise HTTPException(status_code=400, detail="Invalid severity level")
-            updates['severity'] = severity
-        
-        if not updates:
-            raise HTTPException(status_code=400, detail="No configuration changes specified")
-        
-        rule_manager.update_rule(rule_id, **updates)
-        rule_manager.save_config()
-        
-        return {
-            "status": "success",
-            "rule_id": rule_id,
-            "updates": updates,
-            "message": f"Rule {rule_id} configuration updated"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Rule configuration failed: {str(e)}")
-
-
-@app.post("/rules/rule-set/{rule_set_name}/toggle")
-async def toggle_rule_set(rule_set_name: str, enabled: bool):
-    """
-    Enable or disable an entire rule set.
-    Useful for quickly toggling security, ML, or style rule categories.
-    """
-    try:
-        rule_manager = get_rule_manager()
-        
-        if rule_set_name not in rule_manager.project_config.rule_sets:
-            raise HTTPException(status_code=404, detail=f"Rule set '{rule_set_name}' not found")
-        
-        if enabled:
-            rule_manager.enable_rule_set(rule_set_name)
-        else:
-            rule_manager.disable_rule_set(rule_set_name)
-        
-        rule_manager.save_config()
-        
-        rule_count = len(rule_manager.project_config.rule_sets[rule_set_name])
-        action = "enabled" if enabled else "disabled"
-        
-        return {
-            "status": "success",
-            "rule_set": rule_set_name,
-            "action": action,
-            "rules_affected": rule_count,
-            "message": f"Rule set '{rule_set_name}' {action} ({rule_count} rules)"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Rule set toggle failed: {str(e)}")
-
-
-@app.get("/system/health/detailed")
-async def get_detailed_system_health():
-    """
-    Comprehensive system health check including all enhanced features.
-    """
-    try:
-        # Basic health checks
-        health_status = {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "version": "1.5.0",
-            "environment": os.getenv("ENVIRONMENT", "development")
-        }
-        
-        # Analysis engine status
-        try:
-            from enhanced_audit import EnhancedAuditEngine
-            engine = EnhancedAuditEngine()
-            health_status["analysis_engine"] = {
-                "status": "operational",
-                "tools_available": len(engine.tools),
-                "semantic_analysis": "enabled",
-                "caching": "enabled"
-            }
-        except Exception as e:
-            health_status["analysis_engine"] = {
-                "status": "degraded",
-                "error": str(e)
-            }
-        
-        # Cache system status
-        try:
-            file_cache = get_file_cache()
-            cache_stats = file_cache.get_cache_stats()
-            health_status["cache_system"] = {
-                "status": "operational",
-                "entries": cache_stats["entries"],
-                "size_mb": cache_stats["size_mb"]
-            }
-        except Exception as e:
-            health_status["cache_system"] = {
-                "status": "degraded",
-                "error": str(e)
-            }
-        
-        # Rule configuration status
-        try:
-            rule_manager = get_rule_manager()
-            config_summary = rule_manager.get_config_summary()
-            health_status["rule_system"] = {
-                "status": "operational",
-                "total_rules": config_summary["total_rules"],
-                "enabled_rules": config_summary["enabled_rules"]
-            }
-        except Exception as e:
-            health_status["rule_system"] = {
-                "status": "degraded",
-                "error": str(e)
-            }
-        
-        # Authentication status
-        try:
-            api_key = os.getenv("CODEGUARD_API_KEY")
-            health_status["authentication"] = {
-                "status": "configured" if api_key else "development_mode",
-                "mode": "production" if api_key else "development"
-            }
-        except Exception as e:
-            health_status["authentication"] = {
-                "status": "error",
-                "error": str(e)
-            }
-        
-        return health_status
-    
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
-
-
-if __name__ == "__main__":
-    # Run the application - optimized for both development and Cloud Run
-    environment = os.environ.get("ENVIRONMENT", "development")
-    
-    # Set appropriate default port based on environment
-    if environment == "production":
-        default_port = 8080  # Production deployment port
-    else:
-        default_port = 5000  # Replit development port
-    
-    port = int(os.environ.get("PORT", default_port))
-    
-    print(f"Starting CodeGuard API on 0.0.0.0:{port} (environment: {environment})")
-    
-    try:
-        if environment == "development":
-            # Use import string for reload functionality in development
-            uvicorn.run(
-                "main:app",
-                host="0.0.0.0",
-                port=port,
-                reload=True,
-                log_level="info",
-                access_log=True
-            )
-        else:
-            # Use app object directly in production for better performance
-            uvicorn.run(
-                app,
-                host="0.0.0.0",
-                port=port,
-                reload=False,
-                log_level="info",
-                access_log=True
-            )
-    except Exception as e:
-        print(f"Failed to start CodeGuard API: {e}")
-        import sys
-        sys.exit(1)

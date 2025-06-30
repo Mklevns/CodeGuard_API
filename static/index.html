@@ -51,6 +51,42 @@
             visibility: visible !important;
         }
     </style>
+    <style>
+        .issue-severity-high { border-left: 4px solid #ef4444; background-color: #fef2f2; }
+        .issue-severity-medium { border-left: 4px solid #f59e0b; background-color: #fffbeb; }
+        .issue-severity-low { border-left: 4px solid #3b82f6; background-color: #eff6ff; }
+        .tab-btn.active { background-color: #3b82f6; color: white; }
+        .hidden { display: none; }
+
+        /* Loading spinner animations */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Enhanced button loading states */
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8">

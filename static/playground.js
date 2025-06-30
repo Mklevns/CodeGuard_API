@@ -17,12 +17,12 @@ class CodeGuardPlayground {
         const savedKey = localStorage.getItem('codeguard_api_key');
         const savedProvider = localStorage.getItem('codeguard_ai_provider');
         const rememberKey = localStorage.getItem('codeguard_remember_key') === 'true';
-        
+
         if (savedKey && rememberKey) {
             document.getElementById('apiKey').value = savedKey;
             document.getElementById('rememberKey').checked = true;
         }
-        
+
         if (savedProvider) {
             document.getElementById('aiProvider').value = savedProvider;
         }
@@ -87,7 +87,7 @@ class CodeGuardPlayground {
         safeAddEventListener('auditImproveBtn', 'click', () => this.auditAndImprove());
         safeAddEventListener('improveWithContextBtn', 'click', () => this.improveWithRelatedContext());
         safeAddEventListener('fimBtn', 'click', () => this.openFimTab());
-        
+
         // FIM completion buttons
         safeAddEventListener('runFimBtn', 'click', () => this.runFimCompletion());
         safeAddEventListener('loadFimExample', 'click', () => this.loadFimExample());
@@ -109,7 +109,7 @@ class CodeGuardPlayground {
         safeAddEventListener('downloadImproved', 'click', () => this.downloadImprovedCode());
         safeAddEventListener('exportMarkdown', 'click', () => this.exportReport('markdown'));
         safeAddEventListener('exportHtml', 'click', () => this.exportReport('html'));
-        
+
         // System management buttons
         safeAddEventListener('cacheStatsBtn', 'click', () => this.showCacheStats());
         safeAddEventListener('clearCacheBtn', 'click', () => this.clearCache());
@@ -126,15 +126,15 @@ import pickle
 def train_model(data):
     # Missing random seed
     model = torch.nn.Linear(10, 1)
-    
+
     # Potential security issue
     config = pickle.load(open('config.pkl', 'rb'))
-    
+
     # Missing error handling
     for epoch in range(100):
         loss = model(data)
         print(f"Loss: {loss}")  # Should use logging
-        
+
     return model
 
 # Unused import and undefined variable
@@ -157,7 +157,7 @@ def evaluate_model():
         const filenameInput = document.getElementById('filename');
         const fileSelect = document.getElementById('repoFileSelect');
         const fileSourceInfo = document.getElementById('fileSourceInfo');
-        
+
         filenameInput.classList.remove('hidden');
         fileSelect.classList.add('hidden');
         fileSourceInfo.classList.add('hidden');
@@ -255,16 +255,16 @@ def evaluate_model():
         const filenameEl = document.getElementById('filename');
         const filterEl = document.getElementById('filterFalsePositives');
         const levelEl = document.getElementById('analysisLevel');
-        
+
         if (!codeInputEl || !filenameEl) {
             console.error('Required form elements not found');
             alert('Form elements are missing. Please refresh the page.');
             return;
         }
-        
+
         const code = codeInputEl.value.trim();
         const filename = filenameEl.value || 'main.py';
-        
+
         if (!code) {
             alert('Please enter some code to analyze');
             return;
@@ -275,7 +275,7 @@ def evaluate_model():
         try {
             const endpoint = (filterEl && filterEl.checked) ? '/audit' : '/audit/no-filter';
             const analysisLevel = (levelEl && levelEl.value) ? levelEl.value : 'basic';
-            
+
             const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
                 method: 'POST',
                 headers: {
@@ -302,20 +302,20 @@ def evaluate_model():
             const data = await response.json();
             this.currentResults = data;
             this.displayResults(data);
-            
+
         } catch (error) {
             console.error('Audit error:', error);
             let errorMessage = 'Analysis failed';
-            
+
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 errorMessage = 'Network connection failed. Please check your internet connection.';
             } else if (error.message) {
                 errorMessage = `Analysis failed: ${error.message}`;
             }
-            
+
             this.showErrorBanner(errorMessage);
         } finally {
-            this.hideStatus();
+            this.hideStatus('audit');
         }
     }
 
@@ -325,18 +325,18 @@ def evaluate_model():
         const apiKeyEl = document.getElementById('apiKey');
         const aiProviderEl = document.getElementById('aiProvider');
         const levelEl = document.getElementById('analysisLevel');
-        
+
         if (!codeInputEl || !filenameEl || !apiKeyEl || !aiProviderEl) {
             console.error('Required form elements not found');
             alert('Form elements are missing. Please refresh the page.');
             return;
         }
-        
+
         const code = codeInputEl.value.trim();
         const filename = filenameEl.value || 'main.py';
         const apiKey = apiKeyEl.value.trim();
         const aiProvider = aiProviderEl.value;
-        
+
         if (!code) {
             alert('Please enter some code to improve');
             return;
@@ -410,7 +410,7 @@ def evaluate_model():
             }
 
             const improveData = await improveResponse.json();
-            
+
             // Combine audit and improvement results
             this.currentResults = {
                 ...auditData,
@@ -421,18 +421,18 @@ def evaluate_model():
                 warnings: improveData.warnings,
                 repository_context_used: this.repositoryContext && improveData.repository_context_used
             };
-            
+
             this.displayResults(this.currentResults, true);
-            
+
             // Show context enhancement notice if repository context was used
             if (this.repositoryContext && improveData.repository_context_used) {
                 this.showContextEnhancementNotice(improveData);
             }
-            
+
         } catch (error) {
             console.error('Improvement error:', error);
             let errorMessage = 'Code improvement failed';
-            
+
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 errorMessage = 'Network connection failed. Please check your internet connection.';
             } else if (error.message.includes('401')) {
@@ -442,10 +442,10 @@ def evaluate_model():
             } else if (error.message) {
                 errorMessage = `Code improvement failed: ${error.message}`;
             }
-            
+
             this.showErrorBanner(errorMessage);
         } finally {
-            this.hideStatus();
+            this.hideStatus('improve');
         }
     }
 
@@ -455,18 +455,18 @@ def evaluate_model():
         const apiKeyEl = document.getElementById('apiKey');
         const aiProviderEl = document.getElementById('aiProvider');
         const levelEl = document.getElementById('analysisLevel');
-        
+
         if (!codeInputEl || !filenameEl || !apiKeyEl || !aiProviderEl) {
             console.error('Required form elements not found');
             alert('Form elements are missing. Please refresh the page.');
             return;
         }
-        
+
         const code = codeInputEl.value.trim();
         const filename = filenameEl.value || 'main.py';
         const apiKey = apiKeyEl.value.trim();
         const aiProvider = aiProviderEl.value;
-        
+
         if (!code) {
             alert('Please enter some code to analyze');
             return;
@@ -516,7 +516,7 @@ def evaluate_model():
             }
 
             const data = await response.json();
-            
+
             // Transform audit-and-improve response to match displayResults format
             const transformedData = {
                 issues: data.audit_results?.issues || [],
@@ -540,19 +540,19 @@ def evaluate_model():
                 repository_context_used: this.repositoryContext && data.ai_improvements && 
                     Object.values(data.ai_improvements)[0]?.repository_context_used
             };
-            
+
             this.currentResults = transformedData;
             this.displayResults(transformedData, true);
-            
+
             // Show context enhancement notice if repository context was used
             if (this.repositoryContext && transformedData.repository_context_used) {
                 this.showContextEnhancementNotice(data.ai_improvements ? Object.values(data.ai_improvements)[0] : {});
             }
-            
+
         } catch (error) {
             console.error('Audit and improve error:', error);
             let errorMessage = 'Analysis failed';
-            
+
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 errorMessage = 'Network connection failed. Please check your internet connection.';
             } else if (error.message.includes('401')) {
@@ -562,10 +562,10 @@ def evaluate_model():
             } else if (error.message) {
                 errorMessage = `Analysis failed: ${error.message}`;
             }
-            
+
             this.showErrorBanner(errorMessage);
         } finally {
-            this.hideStatus();
+            this.hideStatus('auditImprove');
         }
     }
 
@@ -581,7 +581,7 @@ def evaluate_model():
             const issueCountEl = document.getElementById('issueCount');
             const fixCountEl = document.getElementById('fixCount');
             const summaryPanelEl = document.getElementById('summaryPanel');
-            
+
             if (issueCountEl) issueCountEl.textContent = data.issues?.length || 0;
             if (fixCountEl) fixCountEl.textContent = data.fixes?.length || 0;
             if (summaryPanelEl) summaryPanelEl.classList.remove('hidden');
@@ -601,7 +601,7 @@ def evaluate_model():
         if (data.frameworks && Array.isArray(data.frameworks) && data.frameworks.length > 0) {
             const frameworkList = document.getElementById('frameworkList');
             const frameworkPanel = document.getElementById('frameworkPanel');
-            
+
             if (frameworkList && frameworkPanel) {
                 frameworkList.innerHTML = '';
                 data.frameworks.forEach(framework => {
@@ -624,7 +624,7 @@ def evaluate_model():
             const improvedCodeEl = document.getElementById('improvedCode');
             if (improvedCodeEl) {
                 improvedCodeEl.textContent = data.improved_code;
-                
+
                 // Defer syntax highlighting to avoid blocking UI
                 if (window.Prism && window.Prism.highlightElement) {
                     if (window.requestIdleCallback) {
@@ -656,7 +656,7 @@ def evaluate_model():
 
     displayIssues(issues, fixes) {
         const issuesList = document.getElementById('issuesList');
-        
+
         if (!issuesList) {
             console.error('Issues list element not found');
             return;
@@ -669,7 +669,7 @@ def evaluate_model():
 
         // Use DocumentFragment for batched DOM operations
         const fragment = document.createDocumentFragment();
-        
+
         // Pre-filter fixes by line/filename for better performance
         const fixesMap = new Map();
         fixes.forEach(fix => {
@@ -786,10 +786,10 @@ def evaluate_model():
             const code = document.getElementById('codeInput').value;
             const filename = document.getElementById('filename').value || 'main.py';
             const filtering = document.getElementById('filterFalsePositives').checked;
-            
+
             // Create cache key
             const cacheKey = `${filename}:${code.length}:${filtering}:${Date.now() - (Date.now() % 300000)}`; // 5min cache
-            
+
             // Check cache first
             if (this.reportCache.has(cacheKey)) {
                 document.getElementById('reportContent').innerHTML = this.reportCache.get(cacheKey);
@@ -815,16 +815,16 @@ def evaluate_model():
             if (response.ok) {
                 const reportData = await response.json();
                 const reportContent = reportData.report || 'Report generation failed';
-                
+
                 // Cache the result
                 this.reportCache.set(cacheKey, reportContent);
-                
+
                 // Clean cache if it gets too large
                 if (this.reportCache.size > 10) {
                     const firstKey = this.reportCache.keys().next().value;
                     this.reportCache.delete(firstKey);
                 }
-                
+
                 document.getElementById('reportContent').innerHTML = reportContent;
             }
         } catch (error) {
@@ -858,7 +858,7 @@ def evaluate_model():
     downloadImprovedCode() {
         const improvedCode = document.getElementById('improvedCode').textContent;
         const filename = document.getElementById('filename').value || 'improved_main.py';
-        
+
         if (improvedCode) {
             const blob = new Blob([improvedCode], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
@@ -900,7 +900,7 @@ def evaluate_model():
                 const content = data.report;
                 const mimeType = format === 'html' ? 'text/html' : 'text/markdown';
                 const extension = format === 'html' ? 'html' : 'md';
-                
+
                 const blob = new Blob([content], { type: mimeType });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -940,13 +940,13 @@ def evaluate_model():
     """Load ML model with security checks."""
     import torch
     import os
-    
+
     # TODO: Add proper validation and security checks`;
-        
+
         const exampleSuffix = `    
     model = torch.load(model_path)
     return model`;
-        
+
         document.getElementById('fimPrefix').value = examplePrefix;
         document.getElementById('fimSuffix').value = exampleSuffix;
     }
@@ -956,19 +956,19 @@ def evaluate_model():
         const suffix = document.getElementById('fimSuffix').value.trim();
         const apiKey = document.getElementById('apiKey').value.trim();
         const provider = document.getElementById('aiProvider').value;
-        
+
         if (!prefix) {
             alert('Please enter a code prefix');
             return;
         }
-        
+
         if (provider === 'deepseek' && !apiKey) {
             alert('DeepSeek API key is required for FIM completion');
             return;
         }
-        
+
         this.showStatus('Running FIM completion...');
-        
+
         try {
             const response = await fetch(`${this.apiBaseUrl}/improve/fim-completion`, {
                 method: 'POST',
@@ -983,16 +983,16 @@ def evaluate_model():
                     max_tokens: 2000
                 })
             });
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const result = await response.json();
             this.displayFimResults(result);
             this.hideStatus();
-            
+
         } catch (error) {
             this.hideStatus();
             console.error('FIM completion error:', error);
@@ -1004,12 +1004,12 @@ def evaluate_model():
         const fimResult = document.getElementById('fimResult');
         const completedCode = result.prefix + '\n' + (result.completion || '') + '\n' + result.suffix;
         fimResult.textContent = completedCode;
-        
+
         if (result.confidence_score !== undefined) {
             document.getElementById('fimConfidenceScore').textContent = Math.round(result.confidence_score * 100);
             document.getElementById('fimConfidence').classList.remove('hidden');
         }
-        
+
         this.currentFimResult = result;
         document.getElementById('resultsSection').classList.remove('hidden');
         this.switchTab('fim');
@@ -1017,11 +1017,11 @@ def evaluate_model():
 
     copyFimResult() {
         if (!this.currentFimResult) return;
-        
+
         const completedCode = this.currentFimResult.prefix + '\n' + 
                              (this.currentFimResult.completion || '') + '\n' + 
                              this.currentFimResult.suffix;
-        
+
         navigator.clipboard.writeText(completedCode).then(() => {
             const btn = document.getElementById('copyFimResult');
             const originalText = btn.textContent;
@@ -1032,13 +1032,13 @@ def evaluate_model():
 
     applyFimResult() {
         if (!this.currentFimResult) return;
-        
+
         const completedCode = this.currentFimResult.prefix + '\n' + 
                              (this.currentFimResult.completion || '') + '\n' + 
                              this.currentFimResult.suffix;
-        
+
         document.getElementById('codeInput').value = completedCode;
-        
+
         const btn = document.getElementById('applyFimResult');
         const originalText = btn.textContent;
         btn.textContent = 'Applied!';
@@ -1049,7 +1049,7 @@ def evaluate_model():
     validateRepoUrl() {
         const repoUrl = document.getElementById('githubRepoUrl').value.trim();
         const analyzeBtn = document.getElementById('analyzeRepo');
-        
+
         if (repoUrl && this.isValidGitHubUrl(repoUrl)) {
             analyzeBtn.disabled = false;
             analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -1083,7 +1083,7 @@ def evaluate_model():
 
         if (statusEl) statusEl.innerHTML = '<span class="text-blue-600">Analyzing repository...</span>';
         if (analyzeBtn) analyzeBtn.disabled = true;
-        
+
         try {
             const payload = { repo_url: repoUrl };
             if (githubToken) {
@@ -1098,7 +1098,7 @@ def evaluate_model():
 
             let result;
             const contentType = response.headers.get('content-type');
-            
+
             try {
                 if (contentType && contentType.includes('application/json')) {
                     result = await response.json();
@@ -1113,22 +1113,22 @@ def evaluate_model():
             if (response.ok && result.status === 'success') {
                 if (statusEl) statusEl.innerHTML = '<span class="text-green-600">✓ Repository analyzed successfully</span>';
                 this.displayRepositoryInfo(result);
-                
+
                 this.repositoryContext = {
                     url: repoUrl,
                     token: githubToken,
                     info: result.repository,
                     contextSummary: result.context_summary
                 };
-                
+
                 // Fetch repository files for dropdown selection
                 await this.fetchRepositoryFiles();
-                
+
                 // Show Smart Context Improve button
                 this.showSmartContextButton();
-                
+
                 this.showSuccessBanner('Repository analyzed successfully');
-                
+
             } else if (response.status === 404) {
                 const errorMsg = 'Repository analysis endpoint not available. This feature may not be implemented yet.';
                 if (statusEl) statusEl.innerHTML = `<span class="text-red-600">✗ ${errorMsg}</span>`;
@@ -1156,7 +1156,7 @@ def evaluate_model():
             const errorMsg = error.message || 'Network error occurred';
             if (statusEl) statusEl.innerHTML = `<span class="text-red-600">✗ Error: ${errorMsg}</span>`;
             if (repoInfoEl) repoInfoEl.classList.add('hidden');
-            
+
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 this.showErrorBanner('Network connection failed. Please check your internet connection.');
             } else {
@@ -1222,10 +1222,10 @@ def evaluate_model():
     populateFileDropdown(files) {
         const selectEl = document.getElementById('repoFileSelect');
         const filenameInput = document.getElementById('filename');
-        
+
         // Clear existing options except the first one
         selectEl.innerHTML = '<option value="">Select a file from repository...</option>';
-        
+
         // Add files to dropdown
         files.forEach(file => {
             const option = document.createElement('option');
@@ -1235,7 +1235,7 @@ def evaluate_model():
                 file.filename;
             selectEl.appendChild(option);
         });
-        
+
         // Store files data for later use
         this.repositoryFiles = files;
     }
@@ -1243,7 +1243,7 @@ def evaluate_model():
     showFileSelector() {
         const filenameInput = document.getElementById('filename');
         const fileSelect = document.getElementById('repoFileSelect');
-        
+
         // Hide filename input and show dropdown
         filenameInput.classList.add('hidden');
         fileSelect.classList.remove('hidden');
@@ -1252,7 +1252,7 @@ def evaluate_model():
     async loadSelectedRepoFile() {
         const selectEl = document.getElementById('repoFileSelect');
         const selectedPath = selectEl.value;
-        
+
         if (!selectedPath || !this.repositoryContext) return;
 
         const statusEl = document.getElementById('repoStatus');
@@ -1279,10 +1279,10 @@ def evaluate_model():
                 // Load file content into editor
                 document.getElementById('codeInput').value = result.file.content;
                 document.getElementById('filename').value = result.file.filename;
-                
+
                 // Show file source info
                 document.getElementById('fileSourceInfo').classList.remove('hidden');
-                
+
                 statusEl.innerHTML = '<span class="text-green-600">✓ File loaded successfully</span>';
             } else {
                 statusEl.innerHTML = '<span class="text-red-600">✗ Failed to load file</span>';
@@ -1304,7 +1304,7 @@ def evaluate_model():
         const filename = document.getElementById('filename').value || 'main.py';
         const apiKey = document.getElementById('apiKey').value.trim();
         const aiProvider = document.getElementById('aiProvider').value;
-        
+
         if (!code) {
             alert('Please enter some code to improve');
             return;
@@ -1323,7 +1323,7 @@ def evaluate_model():
         // Get the selected file path
         const selectEl = document.getElementById('repoFileSelect');
         const selectedPath = selectEl.value;
-        
+
         if (!selectedPath) {
             alert('Please select a file from the repository dropdown');
             return;
@@ -1357,15 +1357,15 @@ def evaluate_model():
             }
 
             const result = await response.json();
-            
+
             // Display results with context information
             this.displaySmartContextResults(result);
-            
+
         } catch (error) {
             console.error('Smart Context Improve error:', error);
             alert(`Smart Context Improve failed: ${error.message}`);
         } finally {
-            this.hideStatus();
+            this.hideStatus('contextImprove');
         }
     }
 
@@ -1428,7 +1428,7 @@ def evaluate_model():
         try {
             const response = await fetch(`${this.apiBaseUrl}/cache/stats`);
             const stats = await response.json();
-            
+
             const message = `Analysis Cache Statistics:
 • Cache Entries: ${stats.file_cache.entries}
 • Valid Entries: ${stats.file_cache.valid_entries}
@@ -1468,7 +1468,7 @@ def evaluate_model():
         try {
             const response = await fetch(`${this.apiBaseUrl}/rules/config`);
             const config = await response.json();
-            
+
             const message = `Rule Configuration:
 • Total Rules: ${config.configuration.total_rules}
 • Enabled Rules: ${config.configuration.enabled_rules}
@@ -1491,7 +1491,7 @@ ${Object.entries(config.rule_sets).map(([name, rules]) => `• ${name}: ${rules.
         try {
             const response = await fetch(`${this.apiBaseUrl}/system/health/detailed`);
             const health = await response.json();
-            
+
             const status = health.status.toUpperCase();
             const message = `System Health: ${status}
 
