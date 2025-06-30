@@ -193,7 +193,7 @@ async def _run_shared_audit(request: AuditRequest, validate_with_ai: bool = True
     Returns:
         AuditResponse with analysis results
     """
-    return await _perform_audit(request, validate_with_ai)
+    return await _perform_audit(request, use_filter=validate_with_ai)
 
 @app.post("/audit", response_model=AuditResponse)
 async def audit_code(request: AuditRequest, current_user: dict = Depends(get_current_user)):
