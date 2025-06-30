@@ -81,19 +81,32 @@ async def playground():
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Playground not found")
 
+async def _run_shared_audit(request: AuditRequest, validate_with_ai: bool = True) -> AuditResponse:
+    """
+    Shared audit logic used by multiple endpoints.
+    
+    Args:
+        request: AuditRequest containing files to analyze
+        validate_with_ai: Whether to apply ChatGPT false positive filtering
+        
+    Returns:
+        AuditResponse with analysis results
+    """
+    return await _perform_audit(request, validate_with_ai=validate_with_ai)
+
 @app.post("/audit", response_model=AuditResponse)
 async def audit_code(request: AuditRequest, current_user: dict = Depends(get_current_user)):
     """
     Standard audit endpoint - includes ChatGPT false positive filtering by default.
     """
-    return await _perform_audit(request, validate_with_ai=True)
+    return await _run_shared_audit(request, validate_with_ai=True)
 
 @app.post("/audit/no-filter", response_model=AuditResponse)
 async def audit_code_no_filter(request: AuditRequest, current_user: dict = Depends(get_current_user)):
     """
     Audit endpoint without ChatGPT false positive filtering for debugging.
     """
-    return await _perform_audit(request, validate_with_ai=False)
+    return await _run_shared_audit(request, validate_with_ai=False)
 
 def _record_audit_telemetry(session_id: str, request: AuditRequest, response: AuditResponse, analysis_time: float):
     """Record telemetry data for audit session."""
@@ -469,35 +482,72 @@ async def terms_of_service():
     else:
         raise HTTPException(status_code=404, detail="Terms of service not found")
 
-@app.post("/improve/code")
-async def improve_code_with_ai(request: dict):
+@app.post("/improve")
+async def improve_code_universal(request: dict):
     """
-    TARGETED CODE IMPROVEMENT: Apply AI fixes to specific known issues in existing code.
+    UNIVERSAL CODE IMPROVEMENT: RESTful endpoint that accepts optional audit results.
     
-    Use this when you already have identified issues and want focused improvements.
-    - Requires pre-existing issues list
-    - Applies fixes to specific problems
-    - Preserves original code structure
-    - Fast, targeted improvements
+    If audit_results are provided:
+    - Applies targeted improvements to known issues (fast)
+    - Preserves code structure by default
+    
+    If audit_results are NOT provided:
+    - Runs full audit first, then applies improvements (comprehensive)
+    - Equivalent to the old /audit-and-improve endpoint
     """
     try:
         # Extract request data
         original_code = request.get("original_code", request.get("code", ""))
         filename = request.get("filename", "code.py")
-        issues = request.get("issues", [])
-        fixes = request.get("fixes", [])
+        audit_results = request.get("audit_results")  # Optional: pre-existing audit results
         improvement_level = request.get("improvement_level", "moderate")
         ai_provider = request.get("ai_provider", "openai")
         ai_api_key = request.get("ai_api_key")
-        target_lines = request.get("target_lines", [])  # NEW: Specific lines to focus on
-        preserve_structure = request.get("preserve_structure", True)  # NEW: Keep original structure
+        target_lines = request.get("target_lines", [])
+        preserve_structure = request.get("preserve_structure", True)
         
         if not original_code:
             raise HTTPException(status_code=400, detail="Code content is required")
         
-        # TARGETED IMPROVEMENT: Require issues to be provided
-        if not issues:
-            raise HTTPException(status_code=400, detail="Issues list is required for targeted improvement. Use /audit-and-improve for discovery.")
+        # If audit results not provided, run audit first
+        if not audit_results:
+            from models import CodeFile, AuditOptions
+            
+            # Create audit request
+            audit_request = AuditRequest(
+                files=[CodeFile(filename=filename, content=original_code)],
+                options=AuditOptions(
+                    level=request.get("analysis_level", "strict"),
+                    framework=request.get("framework", "auto"),
+                    target=request.get("target", "gpu")
+                ),
+                ai_provider=ai_provider,
+                ai_api_key=ai_api_key
+            )
+            
+            # Run shared audit logic
+            audit_response = await _run_shared_audit(audit_request, validate_with_ai=True)
+            
+            # Extract issues and fixes
+            issues = [issue.dict() for issue in audit_response.issues]
+            fixes = [fix.dict() for fix in audit_response.fixes]
+            
+            improvement_mode = "comprehensive"
+        else:
+            # Use provided audit results
+            issues = audit_results.get("issues", [])
+            fixes = audit_results.get("fixes", [])
+            improvement_mode = "targeted"
+            
+            if not issues:
+                return {
+                    "improved_code": original_code,
+                    "applied_fixes": [],
+                    "improvement_summary": "No issues found in provided audit results",
+                    "confidence_score": 1.0,
+                    "warnings": [],
+                    "improvement_mode": improvement_mode
+                }
         
         # Convert dict issues/fixes to model objects for compatibility
         from models import Issue, Fix
@@ -523,7 +573,7 @@ async def improve_code_with_ai(request: dict):
             ) for fix in fixes
         ]
         
-        # TARGETED IMPROVEMENT: Filter issues to only requested lines if specified
+        # Filter issues to only requested lines if specified
         if target_lines:
             issue_objects = [issue for issue in issue_objects if issue.line in target_lines]
             
@@ -552,11 +602,28 @@ async def improve_code_with_ai(request: dict):
             "warnings": response.warnings,
             "original_issues_count": len(issues),
             "fixes_applied_count": len(response.applied_fixes),
-            "fix_categories": _categorize_fixes_by_type(issues)
+            "fix_categories": _categorize_fixes_by_type(issues),
+            "improvement_mode": improvement_mode,
+            "audit_was_run": audit_results is None
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Code improvement failed: {str(e)}")
+
+@app.post("/improve/code")
+async def improve_code_with_ai(request: dict):
+    """
+    LEGACY ENDPOINT: Redirects to /improve with targeted mode.
+    Maintained for backward compatibility.
+    """
+    # Add audit_results to force targeted mode
+    if "audit_results" not in request and "issues" in request:
+        request["audit_results"] = {
+            "issues": request.get("issues", []),
+            "fixes": request.get("fixes", [])
+        }
+    
+    return await improve_code_universal(request)
 
 def _categorize_fixes_by_type(issues):
     """Categorize issues by type for bulk fixing"""
@@ -1193,80 +1260,52 @@ async def audit_and_improve_combined(request: AuditRequest):
     """
     COMPREHENSIVE CODE ANALYSIS: Full audit + intelligent AI improvements in one workflow.
     
-    Use this for complete code transformation and enhancement:
-    - Discovers ALL issues automatically (no pre-existing list needed)
-    - Applies advanced AI reasoning and best practices
-    - Restructures code for optimal quality
-    - Comprehensive analysis with telemetry tracking
-    - Best for new code review or major refactoring
+    This endpoint now uses the shared audit logic and delegates to the universal /improve endpoint.
+    Maintained for backward compatibility but redirects to the more RESTful /improve endpoint.
     """
     try:
-        # Perform initial audit WITHOUT false positive filtering to get all issues
-        audit_response = await _perform_audit(request, validate_with_ai=False)
+        # Run shared audit logic
+        audit_response = await _run_shared_audit(request, validate_with_ai=False)
         
         # Track telemetry for the audit
         session_id = str(uuid.uuid4())
         start_time = time.time()
         
-        # Improve each file using AI
+        # Process each file through the universal improve endpoint
         improvements = {}
-        batch_improver = get_batch_improver()
         
-        if request.files:
+        for file in request.files:
+            # Prepare improvement request for universal endpoint
+            improve_request = {
+                "original_code": file.content,
+                "filename": file.filename,
+                "audit_results": {
+                    "issues": [issue.dict() for issue in audit_response.issues if issue.filename == file.filename],
+                    "fixes": [fix.dict() for fix in audit_response.fixes if fix.filename == file.filename]
+                },
+                "improvement_level": "aggressive",
+                "preserve_structure": False,
+                "ai_provider": request.ai_provider or "openai",
+                "ai_api_key": request.ai_api_key
+            }
+            
             try:
-                # Create improvement requests for each file
-                for file in request.files:
-                    from chatgpt_integration import CodeImprovementRequest
-                    
-                    # COMPREHENSIVE IMPROVEMENT: Use aggressive level for complete transformation
-                    improvement_request = CodeImprovementRequest(
-                        original_code=file.content,
-                        filename=file.filename,
-                        issues=audit_response.issues,
-                        fixes=audit_response.fixes,
-                        improvement_level="aggressive",  # More comprehensive improvements
-                        preserve_functionality=False,   # Allow restructuring for better code
-                        ai_provider=request.ai_provider or "openai",
-                        ai_api_key=request.ai_api_key
-                    )
-                    
-                    code_improver = get_code_improver()
-                    improvement = code_improver.improve_code(improvement_request)
-                    
-                    improvements[file.filename] = {
-                        "improved_code": improvement.improved_code,
-                        "applied_fixes": improvement.applied_fixes,
-                        "improvement_summary": improvement.improvement_summary,
-                        "confidence_score": improvement.confidence_score,
-                        "warnings": improvement.warnings
-                    }
+                improvement_result = await improve_code_universal(improve_request)
+                improvements[file.filename] = {
+                    "improved_code": improvement_result["improved_code"],
+                    "applied_fixes": improvement_result["applied_fixes"],
+                    "improvement_summary": improvement_result["improvement_summary"],
+                    "confidence_score": improvement_result["confidence_score"],
+                    "warnings": improvement_result["warnings"]
+                }
             except Exception as e:
-                # If AI improvement fails, apply fallback improvements
-                for file in request.files:
-                    from chatgpt_integration import CodeImprovementRequest
-                    
-                    # Create fallback improvement request
-                    fallback_request = CodeImprovementRequest(
-                        original_code=file.content,
-                        filename=file.filename,
-                        issues=audit_response.issues,
-                        fixes=audit_response.fixes,
-                        improvement_level="moderate",
-                        preserve_functionality=True,
-                        ai_provider="fallback",
-                        ai_api_key=None
-                    )
-                    
-                    code_improver = get_code_improver()
-                    fallback_improvement = code_improver._fallback_improvement(fallback_request)
-                    
-                    improvements[file.filename] = {
-                        "improved_code": fallback_improvement.improved_code,
-                        "applied_fixes": fallback_improvement.applied_fixes,
-                        "improvement_summary": f"AI improvement failed: {str(e)}. Applied {len(fallback_improvement.applied_fixes)} automatic fixes.",
-                        "confidence_score": fallback_improvement.confidence_score,
-                        "warnings": fallback_improvement.warnings + [f"Could not connect to {request.ai_provider or 'AI provider'}: {str(e)}"]
-                    }
+                improvements[file.filename] = {
+                    "improved_code": file.content,
+                    "applied_fixes": [],
+                    "improvement_summary": f"AI improvement failed: {str(e)}",
+                    "confidence_score": 0.0,
+                    "warnings": [f"Could not improve {file.filename}: {str(e)}"]
+                }
         
         # Calculate improvement statistics
         total_ai_fixes = sum(len(imp.get("applied_fixes", [])) for imp in improvements.values())
