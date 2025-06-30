@@ -609,10 +609,14 @@ class EnhancedAuditEngine:
 
     def _run_rl_plugin(self, file_path: str, original_filename: str, content: str, temp_dir: str) -> Tuple[List[Issue], List[Fix]]:
         """Run RL environment plugin analysis."""
-        if original_filename.endswith('.yaml') or original_filename.endswith('.yml'):
-            return rl_config_analyzer.analyze_config(original_filename, content)
-        else:
-            return rl_env_analyzer.analyze_environment_code(original_filename, content)
+        try:
+            if original_filename.endswith('.yaml') or original_filename.endswith('.yml'):
+                return rl_config_analyzer.analyze_config(original_filename, content)
+            else:
+                return rl_env_analyzer.analyze_environment_code(original_filename, content)
+        except Exception as e:
+            # Handle RL plugin errors gracefully
+            return [], []
 
     def _categorize_flake8_issue(self, code: str) -> str:
         """Categorizes flake8 error codes into issue types."""
@@ -965,17 +969,20 @@ class EnhancedAuditEngine:
 @contextmanager
 def in_memory_file_context(filename: str, content: str):
     """Context manager for in-memory file operations."""
+    temp_file_path = None
     try:
         # Create a temporary file only when absolutely necessary
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
             temp_file.write(content)
             temp_file.flush()
-            yield temp_file.name
+            temp_file_path = temp_file.name
+            yield temp_file_path
     finally:
-        try:
-            os.unlink(temp_file.name)
-        except (OSError, UnboundLocalError):
-            pass
+        if temp_file_path is not None:
+            try:
+                os.unlink(temp_file_path)
+            except OSError:
+                pass  # File may already be deleted
 
 def run_flake8_analysis_in_memory(filename: str, content: str, filter_false_positives: bool = True) -> Dict[str, Any]:
     """Run flake8 analysis on code content without file I/O overhead."""
@@ -1105,7 +1112,7 @@ def get_severity_from_code(code: str) -> str:
     else:
         return "warning"
 
-def audit_code_comprehensive(files: List[Dict[str, str]], options: Dict[str, Any] = None, use_in_memory: bool = True) -> Dict[str, Any]:
+def audit_code_comprehensive(files: List[Dict[str, str]], options: Optional[Dict[str, Any]] = None, use_in_memory: bool = True) -> Dict[str, Any]:
     """
     Comprehensive code auditing using multiple static analysis tools.
 
